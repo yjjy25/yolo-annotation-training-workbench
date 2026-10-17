@@ -1,0 +1,5 @@
+python312.zip
+.
+../../.venv/Lib/site-packages
+../../X-AnyLabeling
+import site

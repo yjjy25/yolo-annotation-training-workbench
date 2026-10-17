@@ -1,0 +1,17 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const path=require('node:path');
+const source=fs.readFileSync(path.join(__dirname,'main.cjs'),'utf8');
+const start=source.indexOf('const thumbnailCache=new Map();');
+const end=source.indexOf("ipcMain.handle('desktop:images'",start);
+let encodes=0;
+const ctx={fs:{statSync:()=>({mtimeMs:123})},path,nativeImage:{createFromPath:location=>({isEmpty:()=>false,resize:()=>({toDataURL:()=>{encodes++;return location;}})})}};
+vm.createContext(ctx);vm.runInContext(source.slice(start,end),ctx);
+const tile={width:300,height:200};ctx.tile=tile;
+const first=vm.runInContext("thumbnailFor('/project-a/images','same.png',tile)",ctx);
+const second=vm.runInContext("thumbnailFor('/project-b/images','same.png',tile)",ctx);
+assert.notEqual(first,second,'Projects with matching names and timestamps must not share thumbnails');
+vm.runInContext("thumbnailFor('/project-a/images','same.png',tile)",ctx);
+assert.equal(encodes,2,'A repeated request should use the cache');
+console.log('Passed cross-project thumbnail and cache regression');

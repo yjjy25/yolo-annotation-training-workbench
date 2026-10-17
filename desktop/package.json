@@ -1,0 +1,16 @@
+{
+  "name": "annotation-training-workbench",
+  "version": "0.4.1",
+  "private": true,
+  "description": "Integrated Electron annotation and training studio with full X-AnyLabeling tools",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "check": "node --check editor-edge.test.cjs && node --check editor.js && node --check exit-qa.cjs && node --check hires-qa.cjs && node --check inline-qa.cjs && node --check inline-tools.js && node --check main.cjs && node --check package-qa.cjs && node --check pages-qa.cjs && node --check preload.cjs && node --check qa-extra.cjs && node --check shapes-qa.cjs && node --check studio-qa.cjs && node --check studio.js && node --check traincheck-qa.cjs",
+    "test": "node editor-edge.test.cjs && node release-regression.test.cjs"
+  },
+  "devDependencies": {
+    "electron": "44.8.0"
+  },
+  "license": "GPL-3.0-only"
+}

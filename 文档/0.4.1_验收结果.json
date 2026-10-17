@@ -1,0 +1,160 @@
+{
+  "version": "0.4.1",
+  "date": "2026-10-17",
+  "python_checks": {
+    "passed": 126,
+    "ok": true,
+    "modules": [
+      {
+        "test": "X-AnyLabeling/tests/workflow/test_desktop.py",
+        "exit": 0,
+        "passed": 15
+      },
+      {
+        "test": "X-AnyLabeling/tests/workflow/test_gui.py",
+        "exit": 0,
+        "passed": 1
+      },
+      {
+        "test": "X-AnyLabeling/tests/workflow/test_project.py",
+        "exit": 0,
+        "passed": 17
+      },
+      {
+        "test": "X-AnyLabeling/tests/workflow/test_release_regressions.py",
+        "exit": 0,
+        "passed": 8
+      },
+      {
+        "test": "X-AnyLabeling/tests/test_auto_training/test_dataset.py",
+        "exit": 0,
+        "passed": 19
+      },
+      {
+        "test": "X-AnyLabeling/tests/test_auto_training/test_dialog.py",
+        "exit": 0,
+        "passed": 21
+      },
+      {
+        "test": "X-AnyLabeling/tests/test_auto_training/test_environment.py",
+        "exit": 0,
+        "passed": 18
+      },
+      {
+        "test": "X-AnyLabeling/tests/test_auto_training/test_exporter.py",
+        "exit": 0,
+        "passed": 7
+      },
+      {
+        "test": "X-AnyLabeling/tests/test_auto_training/test_trainer.py",
+        "exit": 0,
+        "passed": 6
+      },
+      {
+        "test": "X-AnyLabeling/tests/test_auto_training/test_worker.py",
+        "exit": 0,
+        "passed": 14
+      }
+    ]
+  },
+  "editor_edge_cases": 85,
+  "thumbnail_regression": "passed",
+  "runtime_checks": {
+    "windows": {
+      "environment": "Windows desktop",
+      "device": "cpu",
+      "errors": [],
+      "tasks": [
+        {
+          "task": "detect",
+          "classes": [
+            "猫",
+            "狗"
+          ],
+          "multipleInstances": true,
+          "training": "completed",
+          "proposals": 6,
+          "originalsUnchanged": true
+        },
+        {
+          "task": "pose",
+          "classes": [
+            "站立",
+            "趴卧"
+          ],
+          "multipleInstances": true,
+          "training": "completed",
+          "proposals": 6,
+          "originalsUnchanged": true
+        }
+      ]
+    },
+    "linux": {
+      "environment": "WSL Ubuntu with WSLg; --no-sandbox --disable-gpu",
+      "device": "cpu",
+      "errors": [],
+      "tasks": [
+        {
+          "task": "detect",
+          "classes": [
+            "猫",
+            "狗"
+          ],
+          "multipleInstances": true,
+          "training": "completed",
+          "proposals": 6,
+          "originalsUnchanged": true
+        },
+        {
+          "task": "pose",
+          "classes": [
+            "站立",
+            "趴卧"
+          ],
+          "multipleInstances": true,
+          "training": "completed",
+          "proposals": 6,
+          "originalsUnchanged": true
+        }
+      ]
+    },
+    "windows_extracted_gpu": {
+      "environment": "New EXE installer --extract-only then launch extracted application",
+      "device": "0",
+      "errors": [],
+      "tasks": [
+        {
+          "task": "detect",
+          "classes": [
+            "猫",
+            "狗"
+          ],
+          "multipleInstances": true,
+          "training": "completed",
+          "proposals": 6,
+          "originalsUnchanged": true
+        },
+        {
+          "task": "pose",
+          "classes": [
+            "站立",
+            "趴卧"
+          ],
+          "multipleInstances": true,
+          "training": "completed",
+          "proposals": 6,
+          "originalsUnchanged": true
+        }
+      ]
+    }
+  },
+  "archive_checks": {
+    "source_files_per_platform": 1449,
+    "windows_zip_crc": "passed",
+    "deb_stream": "passed",
+    "installer_extract": "passed",
+    "parts_reassembled_hashes": "passed"
+  },
+  "original_project_files_unchanged": 656,
+  "native_join_helpers": "PowerShell and Bash fixture reconstruction passed"
+}

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=X-AnyLabeling
+Comment=AI-assisted annotation for text, images, video, and multimodal data
+Exec=xanylabeling
+Icon=x-anylabeling
+Terminal=false
+Type=Application
+Categories=Graphics;RasterGraphics;
+StartupNotify=true
