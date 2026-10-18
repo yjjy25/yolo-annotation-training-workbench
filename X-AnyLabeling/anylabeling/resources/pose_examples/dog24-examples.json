@@ -1,0 +1,989 @@
+{
+  "version": 1,
+  "template_points": [
+    "front_left_paw",
+    "front_left_knee",
+    "front_left_elbow",
+    "rear_left_paw",
+    "rear_left_knee",
+    "rear_left_elbow",
+    "front_right_paw",
+    "front_right_knee",
+    "front_right_elbow",
+    "rear_right_paw",
+    "rear_right_knee",
+    "rear_right_elbow",
+    "tail_start",
+    "tail_end",
+    "left_ear_base",
+    "right_ear_base",
+    "nose",
+    "chin",
+    "left_ear_tip",
+    "right_ear_tip",
+    "left_eye",
+    "right_eye",
+    "withers",
+    "throat"
+  ],
+  "examples": [
+    {
+      "id": "n02108000_2172",
+      "photo": "n02108000_2172.jpg",
+      "title": "全身侧面与转头",
+      "annotation": {
+        "imageWidth": 640,
+        "imageHeight": 480,
+        "shapes": [
+          {
+            "label": "front_left_paw",
+            "shape_type": "point",
+            "points": [
+              [
+                600.3328,
+                431.3328
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "front_left_knee",
+            "shape_type": "point",
+            "points": [
+              [
+                563.6672,
+                392.0016
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "front_left_elbow",
+            "shape_type": "point",
+            "points": [
+              [
+                561.3312,
+                308.0016
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "rear_left_paw",
+            "shape_type": "point",
+            "points": [
+              [
+                305.664,
+                352.66560000000004
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "rear_left_knee",
+            "shape_type": "point",
+            "points": [
+              [
+                228.9984,
+                304.3344
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "rear_left_elbow",
+            "shape_type": "point",
+            "points": [
+              [
+                283.0016,
+                252.49919999999997
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "front_right_paw",
+            "shape_type": "point",
+            "points": [
+              [
+                428.99839999999995,
+                466.6656
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "front_right_knee",
+            "shape_type": "point",
+            "points": [
+              [
+                407.00159999999994,
+                404.3328
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "front_right_elbow",
+            "shape_type": "point",
+            "points": [
+              [
+                391.00160000000005,
+                302.66880000000003
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "rear_right_paw",
+            "shape_type": "point",
+            "points": [
+              [
+                206.0032,
+                414.3312
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "rear_right_knee",
+            "shape_type": "point",
+            "points": [
+              [
+                164.9984,
+                335.33279999999996
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "rear_right_elbow",
+            "shape_type": "point",
+            "points": [
+              [
+                184.6656,
+                199.3344
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "tail_start",
+            "shape_type": "point",
+            "points": [
+              [
+                199.0016,
+                88.6656
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "tail_end",
+            "shape_type": "point",
+            "points": [
+              [
+                119.66720000000001,
+                63.3312
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "left_ear_base",
+            "shape_type": "point",
+            "points": [
+              [
+                568.6656,
+                129.3312
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "right_ear_base",
+            "shape_type": "point",
+            "points": [
+              [
+                443.6672,
+                115.6656
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "nose",
+            "shape_type": "point",
+            "points": [
+              [
+                454.66880000000003,
+                243.33119999999997
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "chin",
+            "shape_type": "point",
+            "points": [
+              [
+                460.9984,
+                267.33119999999997
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "left_ear_tip",
+            "shape_type": "point",
+            "points": [
+              [
+                584.9024,
+                219.5184
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "right_ear_tip",
+            "shape_type": "point",
+            "points": [
+              [
+                409.1904,
+                187.31040000000002
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "left_eye",
+            "shape_type": "point",
+            "points": [
+              [
+                524,
+                184
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": true
+            },
+            "source": "manual_teaching_location"
+          },
+          {
+            "label": "right_eye",
+            "shape_type": "point",
+            "points": [
+              [
+                465,
+                174
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": true
+            },
+            "source": "manual_teaching_location"
+          },
+          {
+            "label": "withers",
+            "shape_type": "point",
+            "points": [
+              [
+                397,
+                121
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": true
+            },
+            "source": "manual_teaching_location"
+          },
+          {
+            "label": "throat",
+            "shape_type": "point",
+            "points": [
+              [
+                506,
+                278
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": true
+            },
+            "source": "manual_teaching_location"
+          }
+        ]
+      },
+      "source": "https://github.com/ultralytics/assets/releases/download/v0.0.0/dog-pose.zip",
+      "image_member": "images/train/n02108000_2172.jpg",
+      "label_member": "labels/train/n02108000_2172.txt",
+      "photo_sha256": "b2f5107e13bcafde50424229ea7d19cae0ff157143d859d1cdcd2e7865b14b71",
+      "original_yolo_annotation": [
+        0.0,
+        0.50078,
+        0.51146,
+        0.99219,
+        0.96875,
+        0.93802,
+        0.89861,
+        2.0,
+        0.88073,
+        0.81667,
+        2.0,
+        0.87708,
+        0.64167,
+        2.0,
+        0.4776,
+        0.73472,
+        2.0,
+        0.35781,
+        0.63403,
+        2.0,
+        0.44219,
+        0.52604,
+        2.0,
+        0.67031,
+        0.97222,
+        2.0,
+        0.63594,
+        0.84236,
+        2.0,
+        0.61094,
+        0.63056,
+        2.0,
+        0.32188,
+        0.86319,
+        2.0,
+        0.25781,
+        0.69861,
+        2.0,
+        0.28854,
+        0.41528,
+        2.0,
+        0.31094,
+        0.18472,
+        2.0,
+        0.18698,
+        0.13194,
+        2.0,
+        0.88854,
+        0.26944,
+        2.0,
+        0.69323,
+        0.24097,
+        2.0,
+        0.71042,
+        0.50694,
+        2.0,
+        0.72031,
+        0.55694,
+        2.0,
+        0.91391,
+        0.45733,
+        2.0,
+        0.63936,
+        0.39023,
+        2.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "全身照片上的编号与当前狗模板一致。1–20 沿用数据集坐标；21–24 为人工教学定位（橙色，近似参考），不是数据集真值。不自动加入训练。"
+    },
+    {
+      "id": "n02089078_3088",
+      "photo": "n02089078_3088.jpg",
+      "title": "全身与正面头部",
+      "annotation": {
+        "imageWidth": 400,
+        "imageHeight": 340,
+        "shapes": [
+          {
+            "label": "front_left_paw",
+            "shape_type": "point",
+            "points": [
+              [
+                80.0,
+                316.3326
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "front_left_knee",
+            "shape_type": "point",
+            "points": [
+              [
+                94.0,
+                278.001
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "front_left_elbow",
+            "shape_type": "point",
+            "points": [
+              [
+                103.668,
+                186.00039999999998
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "rear_left_paw",
+            "shape_type": "point",
+            "points": [
+              [
+                298.668,
+                270.334
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "rear_left_knee",
+            "shape_type": "point",
+            "points": [
+              [
+                290.668,
+                220.66680000000002
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "rear_left_elbow",
+            "shape_type": "point",
+            "points": [
+              [
+                261.5,
+                160.50039999999998
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "front_right_paw",
+            "shape_type": "point",
+            "points": [
+              [
+                74.0,
+                287.334
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "front_right_knee",
+            "shape_type": "point",
+            "points": [
+              [
+                82.0,
+                255.4998
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "front_right_elbow",
+            "shape_type": "point",
+            "points": [
+              [
+                76.0,
+                185.50060000000002
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "rear_right_paw",
+            "shape_type": "point",
+            "points": [
+              [
+                263.668,
+                261.3342
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "rear_right_knee",
+            "shape_type": "point",
+            "points": [
+              [
+                272.668,
+                226.00140000000002
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "rear_right_elbow",
+            "shape_type": "point",
+            "points": [
+              [
+                231.0,
+                167.0012
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "tail_start",
+            "shape_type": "point",
+            "points": [
+              [
+                275.0,
+                100.33399999999999
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "tail_end",
+            "shape_type": "point",
+            "points": [
+              [
+                385.332,
+                127.3334
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "left_ear_base",
+            "shape_type": "point",
+            "points": [
+              [
+                100.332,
+                46.3318
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "right_ear_base",
+            "shape_type": "point",
+            "points": [
+              [
+                40.5,
+                38.501599999999996
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "nose",
+            "shape_type": "point",
+            "points": [
+              [
+                74.668,
+                47.3348
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "chin",
+            "shape_type": "point",
+            "points": [
+              [
+                74.332,
+                71.332
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "left_ear_tip",
+            "shape_type": "point",
+            "points": [
+              [
+                113.95200000000001,
+                112.88000000000001
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "right_ear_tip",
+            "shape_type": "point",
+            "points": [
+              [
+                30.652,
+                119.43180000000001
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": false
+            },
+            "source": "original_dataset_annotation"
+          },
+          {
+            "label": "left_eye",
+            "shape_type": "point",
+            "points": [
+              [
+                88,
+                27
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": true
+            },
+            "source": "manual_teaching_location"
+          },
+          {
+            "label": "right_eye",
+            "shape_type": "point",
+            "points": [
+              [
+                60,
+                27
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": true
+            },
+            "source": "manual_teaching_location"
+          },
+          {
+            "label": "withers",
+            "shape_type": "point",
+            "points": [
+              [
+                111,
+                90
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": true
+            },
+            "source": "manual_teaching_location"
+          },
+          {
+            "label": "throat",
+            "shape_type": "point",
+            "points": [
+              [
+                77,
+                100
+              ]
+            ],
+            "group_id": 1,
+            "difficult": false,
+            "flags": {
+              "teaching_reference": true
+            },
+            "source": "manual_teaching_location"
+          }
+        ]
+      },
+      "source": "https://github.com/ultralytics/assets/releases/download/v0.0.0/dog-pose.zip",
+      "image_member": "images/train/n02089078_3088.jpg",
+      "label_member": "labels/train/n02089078_3088.txt",
+      "photo_sha256": "0db2f6d8ac4c93d2f849758b16924ffaf1740a8769866f1e3a8e0143b98df3ee",
+      "original_yolo_annotation": [
+        0.0,
+        0.50125,
+        0.49412,
+        0.9525,
+        0.95294,
+        0.2,
+        0.93039,
+        2.0,
+        0.235,
+        0.81765,
+        2.0,
+        0.25917,
+        0.54706,
+        2.0,
+        0.74667,
+        0.7951,
+        2.0,
+        0.72667,
+        0.64902,
+        2.0,
+        0.65375,
+        0.47206,
+        2.0,
+        0.185,
+        0.8451,
+        2.0,
+        0.205,
+        0.75147,
+        2.0,
+        0.19,
+        0.54559,
+        2.0,
+        0.65917,
+        0.76863,
+        2.0,
+        0.68167,
+        0.66471,
+        2.0,
+        0.5775,
+        0.49118,
+        2.0,
+        0.6875,
+        0.2951,
+        2.0,
+        0.96333,
+        0.37451,
+        2.0,
+        0.25083,
+        0.13627,
+        2.0,
+        0.10125,
+        0.11324,
+        2.0,
+        0.18667,
+        0.13922,
+        2.0,
+        0.18583,
+        0.2098,
+        2.0,
+        0.28488,
+        0.332,
+        2.0,
+        0.07663,
+        0.35127,
+        2.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "全身照片上的编号与当前狗模板一致。1–20 沿用数据集坐标；21–24 为人工教学定位（橙色，近似参考），不是数据集真值。不自动加入训练。"
+    }
+  ]
+}

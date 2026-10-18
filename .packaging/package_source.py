@@ -12,12 +12,13 @@ OUT = ROOT / '发行包/源码'
 OUT.mkdir(parents=True, exist_ok=True)
 TARGET = OUT / ('AnnotationWorkbench-' + VERSION)
 EXCLUDED = {'.git', '.venv', '.runtime', 'node_modules', '__pycache__', '.pytest_cache', '.ruff_cache', 'build', 'dist', 'runs', '.vscode'}
+LOCAL_DOCS = {'磁盘清理记录_20261018.md', '清理确认清单_20261018.md'}
 files = []
 for folder in ('X-AnyLabeling', 'desktop', '文档', '.github'):
     for base, dirs, names in os.walk(ROOT / folder):
         dirs[:] = [d for d in dirs if d not in EXCLUDED and not d.endswith('.egg-info')]
-        files.extend(Path(base)/n for n in names if not n.endswith(('.pyc', '.pt', '.onnx', '.log')))
-files += [ROOT/n for n in ('README.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md', '.gitignore', '.gitattributes', 'setup-windows.ps1', '双击启动.vbs', 'setup-linux.sh', 'start.sh', '.runtime/launcher.pyw', '.runtime/python/python312._pth')]
+        files.extend(Path(base)/n for n in names if n not in LOCAL_DOCS and not n.endswith(('.pyc', '.pt', '.onnx', '.log')))
+files += [ROOT/n for n in ('README.md', 'CHANGELOG.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md', '.gitignore', '.gitattributes', 'setup-windows.ps1', '双击启动.vbs', 'setup-linux.sh', 'start.sh', '.runtime/launcher.pyw', '.runtime/python/python312._pth')]
 files += list((ROOT / '.runtime/fonts').glob('*'))
 files += [ROOT/'.packaging'/n for n in ('join.ps1','join.sh')]
 files += [ROOT/'.packaging'/n for n in ('build_release.py','build_deb.py','linux_manifest.py','prepare-linux.sh','package_source.py','verify_release.py','split_release.py','run_checks.py','Installer.cs','构建说明.md')]

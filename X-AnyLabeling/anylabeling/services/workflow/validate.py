@@ -81,7 +81,7 @@ def resolve_source(project, source, custom_path=None):
         video = Path(custom_path or "")
         if not video.is_file():
             raise ValueError("请选择一个视频文件。")
-        return {"kind": "video", "value": video, "label": f"视频抽帧：{video.name}", "frozen": False}
+        return {"kind": "video", "value": video, "label": f"视频逐帧预测：{video.name}", "frozen": False}
     raise ValueError("验证对象无效。")
 
 
@@ -116,6 +116,53 @@ def sample_video(video, target, every_seconds=1.0):
         raise ValueError("视频里没有取到可用帧。")
     print(f"视频共 {frames} 帧，按每 {every_seconds} 秒抽帧得到 {saved} 张", flush=True)
     return target
+
+
+def render_video_predictions(predictions, source, output, screenshot_step=1.0):
+    """Stream plotted results into a browser-playable VP8 video with bounded memory."""
+    import cv2
+    import math
+    capture = cv2.VideoCapture(str(source))
+    try:
+        fps = capture.get(cv2.CAP_PROP_FPS)
+    finally:
+        capture.release()
+    if not math.isfinite(fps) or fps <= 0:
+        fps = 25.0
+    target = output / "predictions.webm"
+    temporary = output / "predictions.partial.webm"
+    writer = None
+    frames = 0
+    step = max(1, round(fps * max(0.0, float(screenshot_step or 0))))
+    try:
+        for result in predictions:
+            image = result.plot()
+            if writer is None:
+                height, width = image.shape[:2]
+                writer = cv2.VideoWriter(str(temporary), cv2.VideoWriter_fourcc(*"VP80"), fps, (width, height))
+                if not writer.isOpened():
+                    raise ValueError("无法编码验证视频（需要 OpenCV 的 VP8/WebM 支持）。")
+            writer.write(image)
+            if screenshot_step is not None and frames % step == 0 and frames // step < 16:
+                ok, encoded = cv2.imencode(".jpg", image)
+                if ok:
+                    encoded.tofile(str(output / f"video_frame_{frames:08d}.jpg"))
+            frames += 1
+            if frames % 100 == 0:
+                print(f"已处理视频 {frames} 帧", flush=True)
+            yield result
+        if not frames:
+            raise ValueError("视频里没有取到可用帧。")
+        writer.release()
+        writer = None
+        temporary.replace(target)
+    finally:
+        if writer is not None:
+            writer.release()
+        temporary.unlink(missing_ok=True)
+        close = getattr(predictions, "close", None)
+        if close:
+            close()
 
 
 def collect_predictions(predictions, allowed_names):
@@ -242,6 +289,7 @@ def history(project):
                 "device": data.get("device"),
                 "at": data.get("at"),
                 "metrics": data.get("metrics", {}),
+                "video": data.get("video"),
                 "plots": [entry["name"] if isinstance(entry, dict) else str(entry) for entry in data.get("plots", [])],
             }
         )
@@ -303,10 +351,8 @@ def run(root, weights, device="cpu", batch=4, imgsz=640, confidence=0.25, plots=
         metrics = summarize(results, task)
         plot_dirs = [Path(getattr(results, "save_dir", output)), output, weights_path.parent, weights_path.parent.parent]
     else:
-        if target["kind"] == "video":
-            source_path = sample_video(target["value"], output / "frames", video_step)
-        else:
-            source_path = target["value"]
+        source_path = target["value"]
+        video = target["kind"] == "video"
         predictions = model.predict(
             stream=True,
             source=str(source_path),
@@ -314,12 +360,14 @@ def run(root, weights, device="cpu", batch=4, imgsz=640, confidence=0.25, plots=
             imgsz=int(imgsz),
             conf=float(confidence),
             iou=float(iou),
-            save=bool(plots),
+            save=bool(plots) and not video,
             project=str(project.root / "validation"),
             name=stamp,
             exist_ok=True,
             verbose=True,
         )
+        if video:
+            predictions = render_video_predictions(predictions, source_path, output, video_step if plots else None)
         summary = collect_predictions(predictions, project.data["classes"])
         metrics = {
             "验证图片数": summary["images"],
@@ -327,9 +375,13 @@ def run(root, weights, device="cpu", batch=4, imgsz=640, confidence=0.25, plots=
             "平均每张目标数": round(summary["objects"] / summary["images"], 2) if summary["images"] else 0,
             "任务": task,
         }
+        if video:
+            metrics["验证帧数"] = metrics.pop("验证图片数")
+            for index, row in enumerate(summary["per_image"]):
+                row["frame"] = index
         for name, number in sorted(summary["by_class"].items(), key=lambda item: -item[1]):
             metrics[f"检出·{name}"] = number
-        plot_dirs = [output, output / "frames", weights_path.parent]
+        plot_dirs = [output] if video else [output, output / "frames", weights_path.parent]
         if summary["images"]:
             empty = sum(1 for row in summary["per_image"] if row["objects"] == 0)
             metrics["无检出图片数"] = empty
@@ -355,6 +407,8 @@ def run(root, weights, device="cpu", batch=4, imgsz=640, confidence=0.25, plots=
         "metrics": metrics,
         "plots_directory": str(plots_dir),
         "plots": plots_found,
+        "video": "predictions.webm" if target["kind"] == "video" else None,
+        "video_audio": False,
     }
     write_json(output / "metrics.json", record)
     for key, value in metrics.items():

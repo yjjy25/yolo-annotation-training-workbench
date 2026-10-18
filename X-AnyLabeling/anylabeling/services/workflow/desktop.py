@@ -20,11 +20,15 @@ def image_path(project, name):
 
 def remove_image(project, name, purge=False):
     """Remove an unusable picture (and everything attached to it)."""
+    from .video_workspace import resolve_store
+    project=resolve_store(project,name)
     path = image_path(project, name)
     return project.remove_image(path, purge=bool(purge))
 
 
 def load_annotation(project, name):
+    from .video_workspace import resolve_store
+    project=resolve_store(project,name)
     path = image_path(project, name)
     label = project.annotation(path)
     candidate = project.root / "proposals" / "latest" / (path.stem + ".json")
@@ -32,7 +36,9 @@ def load_annotation(project, name):
             "base_hash":digest(label), "proposal":read_json(candidate) if candidate.exists() else None}
 
 
-def save_annotation(project, name, annotation, base_hash, checked=False):
+def save_annotation(project, name, annotation, base_hash, checked=False, automated=False):
+    from .video_workspace import resolve_store
+    project=resolve_store(project,name)
     path = image_path(project, name)
     destination = project.annotation(path)
     if digest(destination) != base_hash:
@@ -41,6 +47,9 @@ def save_annotation(project, name, annotation, base_hash, checked=False):
     with Image.open(path) as image:
         width,height = image.size
     data = copy.deepcopy(annotation)
+    if project.data.get("video_workspace"):
+        checked=False
+        if not automated:data.setdefault("tracking",{})["manual_edited"]=True
     if not isinstance(data,dict) or len(data.get("shapes",[])) > 100000:
         raise ValueError("标注数据无效。")
     for shape in data.get("shapes",[]):
@@ -78,6 +87,11 @@ def create_project(args):
         key = args.get("preset", "human")
         template = preset(key) if key in {"human","dog"} else args.get("template")
     name = str(args.get("name", "")).strip()
-    if not name or not args.get("root") or not args.get("source"):
-        raise ValueError("请填写项目名称、图片目录与项目保存目录。")
-    return Project.create(args["root"],name,task,args.get("classes",[]),args["source"],template)
+    if not name or not args.get("root"):
+        raise ValueError("请填写项目名称与项目保存目录。")
+    if args.get("source") and args.get("source_kind") == "video":
+        source = Path(args["source"])
+        if not source.is_file() or source.suffix.lower() not in {".mp4", ".avi", ".mov", ".mkv", ".webm", ".m4v"}:
+            raise ValueError("请选择有效的视频文件。")
+        return Project.create(args["root"],name,task,args.get("classes",[]),template=template)
+    return Project.create(args["root"],name,task,args.get("classes",[]),args.get("source") or None,template)

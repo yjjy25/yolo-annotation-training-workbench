@@ -2,6 +2,7 @@ const api=window.workbench,$=s=>document.querySelector(s);
 // One consistent 24px grid, 1.7 stroke, round joins: simple silhouettes read far
 // better at 18px than the previous mixed-weight drawings.
 const iconPaths={
+ video:'<rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="m10 8 6 4-6 4z"/>',
  data:'<rect x="3.5" y="3.5" width="17" height="17" rx="2.5"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 3.5v17M14.5 3.5v17"/>',
  editor:'<rect x="3.5" y="3.5" width="17" height="17" rx="3"/><rect x="8.5" y="8.5" width="7" height="7" rx="1.5"/><path d="M3.5 7V5.5A2 2 0 0 1 5.5 3.5H7M17 3.5h1.5a2 2 0 0 1 2 2V7M20.5 17v1.5a2 2 0 0 1-2 2H17M7 20.5H5.5a2 2 0 0 1-2-2V17"/>',
  models:'<rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="m12 8.2 1 2.6 2.6 1-2.6 1-1 2.6-1-2.6-2.6-1 2.6-1z"/>',
@@ -40,32 +41,42 @@ const taskShapes={
 };
 let newShape='rectangle';
 let state={ready:false,project:null},page='data',items=[],paging={page:0,pages:1},galleryKey='',projectKey='',modelKey='',modelsContext='',modelGeneration=0,newTask='detect',projectsHome='',newRootEdited=false,toastTimer,searchTimer,loadSequence=0,refreshPending=null,trainingPending=false;
-// "保存草稿" approves by default because most users mark their own data; the
-// switch in the editor toolbar turns that off for outside annotators.
-const AUTO_APPROVE_KEY='annotation-workbench:auto-approve';
-const autoApprove=()=>{try{return localStorage.getItem(AUTO_APPROVE_KEY)!=='0';}catch{return true;}};
-const setAutoApprove=value=>{try{localStorage.setItem(AUTO_APPROVE_KEY,value?'1':'0');}catch{}};
+// Explicit Save confirms review; internal navigation saves remain drafts.
 function toast(message){$('#toast').textContent=message;$('#toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').hidden=true,6000);}
 async function rpc(method,args={}){const result=await api.rpc(method,args);if(!result.ok)throw new Error(result.error);return result.result;}
-window.editor=new AnnotationEditor({rpc,toast,isEditor:()=>page==='editor',navigate:step=>navigate(step),autoApprove:()=>autoApprove(),onSave:()=>{galleryKey='';loadImages();}});
+window.editor=new AnnotationEditor({rpc,toast,isEditor:()=>page==='editor'||(page==='video'&&!$('#tracking-editor-host').hidden),navigate:step=>navigate(step),prepareNext:()=>window.videoTracking?.prepareSaveNext?.()??prepareDatasetNext(),onSave:()=>{galleryKey='';if(window.videoTracking?.ownsTimeline())return;clearTimeout(saveRefreshTimer);saveRefreshTimer=setTimeout(()=>loadImages().catch(e=>toast(e.message)),160);}});
 const editor=window.editor;
+let saveRefreshTimer;
 
-async function go(next){
+let pageRequest=null,pageTask=null;
+function go(next){
+ pageRequest=next;if(pageTask)return pageTask;
+ let operation;
+ operation=Promise.resolve().then(async()=>{while(pageRequest){const target=pageRequest;pageRequest=null;await showPage(target);}}).finally(()=>{if(pageTask===operation)pageTask=null;});
+ pageTask=operation;return operation;
+}
+async function showPage(next){
+ if(page==='validate'&&next!==page)$('#validation-video').pause();
+ if(next===page){if(next==='video'||next==='video-review')await window.videoTracking?.refresh();return;}
+
  const review=next==='review';
  try{
-  if(next!==page)await editor.save();
+  if(next!==page){if(editor.confirming)await editor.confirming;await window.videoTracking?.beforeNavigate(next);await editor.save();}
   if(next==='review'){$('#image-filter').value='pending';paging.page=0;next='data';await loadImages();}
   if(next==='editor'&&!state.project){showNew();return;}
   page=next;
+  await window.videoTracking?.mount(next);
   document.querySelectorAll('main>section').forEach(section=>section.hidden=section.id!=='page-'+page);
   document.querySelectorAll('.nav-item[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===(review?'review':page)));
-  $('#crumb-page').textContent=review?'人工审查 · 待确认图片':{data:'数据与标注',editor:'标注画布',models:'模型预标注',train:'模型训练',validate:'模型验证'}[page];
+  $('#crumb-page').textContent=review?'人工审查 · 待确认图片':{data:'数据与标注',video:'视频追踪标注','video-review':'视频待微调',editor:'标注画布',models:'模型预标注',train:'模型训练',validate:'模型验证'}[page];
+  if(page==='video'||page==='video-review')await window.videoTracking?.refresh();
   // The image list drives the canvas. On a fresh start it is still empty, so an
   // entry into the canvas used to leave a blank picture with an empty label list.
   if(page==='editor'&&!items.length&&state.project)await loadImages();
   if(page==='editor'){editor.fit();if(!editor.name&&items[0]){await editor.open(items[0].name);renderFilmstrip();}}
   if(page==='train'||page==='models')await refreshModels();
   if(page==='train')refreshTrainingResults();
+  if(page==='data')await loadImages();
   if(page==='data'||page==='train')refreshSplitPreview();
   if(page==='validate'){await refreshModels();await refreshValidationPlots();}
  }catch(e){toast(e.message);}
@@ -74,11 +85,35 @@ async function go(next){
 // leaves the project here instead of sitting in the queue forever. Unsaved edits
 // are written first so they move to removed/ together with the picture, and the
 // next picture opens automatically so reviewing can continue.
+const removalKey=root=>'annotation-workbench:skip-remove-confirm:'+root;
+function skipsRemoval(root=state.project?.root){try{return !!root&&localStorage.getItem(removalKey(root))==='1';}catch{return false;}}
+function syncRemovalPreference(){$('#reset-remove-confirm').hidden=!skipsRemoval();}
+async function confirmRemoval(name,video=false){
+ const root=state.project?.root;
+ if(skipsRemoval(root))return true;
+ const dialog=$('#remove-image-dialog');
+ if(dialog.open)return false;
+ $('#remove-image-question').textContent=video?`移除「${name}」的视频微调草稿？`:`把「${name}」移出这个数据集？`;
+ $('#remove-image-detail').textContent=video?'草稿移入视频待确认区的 removed 文件夹；数据集中已审核的副本保留。':'图片、标注和训练/验证划分将移入当前项目的 removed 文件夹，可以取回。';
+ $('#remove-image-remember').checked=false;dialog.returnValue='';
+ return new Promise(resolve=>{
+  dialog.addEventListener('close',()=>{
+   const accepted=dialog.returnValue==='remove';
+   if(accepted&&$('#remove-image-remember').checked){try{localStorage.setItem(removalKey(root),'1');}catch{}}
+   syncRemovalPreference();resolve(accepted&&state.project?.root===root);
+  },{once:true});
+  dialog.showModal();
+ });
+}
+$('#remove-image-confirm').onclick=()=>$('#remove-image-dialog').close('remove');
+for(const id of ['#remove-image-cancel','#remove-image-close'])$(id).onclick=()=>$('#remove-image-dialog').close('cancel');
+$('#reset-remove-confirm').onclick=()=>{try{localStorage.removeItem(removalKey(state.project?.root));}catch{}syncRemovalPreference();toast('已恢复当前项目的移除确认。');};
 async function removeImage(name,quiet=false){
  const target=name||editor.name;
  if(!target)return;
- if(!quiet&&!confirm(`把「${target}」移出这个数据集？\n\n图片、标注和该图的训练/验证划分会一起移入项目的 removed 文件夹，可以再取回；不会直接删除。`))return;
+ if(!quiet&&!await confirmRemoval(target))return;
  const index=items.findIndex(item=>item.name===target);
+ const origin=page,removedCurrent=editor.name===target;
  try{
   // Write pending edits first so they travel into removed/ with the picture.
   if(editor.name===target)await editor.save().catch(()=>{});
@@ -91,37 +126,60 @@ async function removeImage(name,quiet=false){
   // won the token race and returned early.
   const list=Array.isArray(refreshed)?refreshed:items;
   const next=list[Math.min(index,list.length-1)]||list[0];
-  if(next)await openImage(next.name);
-  toast(`已移除「${target}」（含 ${result.removed.length} 个文件）${next?'，已切到下一张。':'。'}`);
+  const continueCanvas=origin==='editor'&&page===origin&&removedCurrent&&!!next;
+  if(continueCanvas)await openImage(next.name);
+  toast(`已移除「${target}」（含 ${result.removed.length} 个文件）${continueCanvas?'，已切到下一张。':'。'}`);
  }catch(error){toast(error.message);}
 }
 $('#remove-image').onclick=()=>removeImage();
 async function openImage(name){
  try{
-  await go('editor');
-  await editor.open(name);
-  renderFilmstrip();
+  if(page!=='editor')await go('editor');
+  if(page!=='editor')return;
+  window.videoTracking?.imageOpened(name);
+  const opened=await editor.open(name);
+  if(opened&&editor.name===name)renderFilmstrip();
  }
  catch(e){toast(e.message);}
 }
 // Navigation follows the whole filtered list, not just the loaded page: stepping
 // past the end pulls the next page in and opens its first image, so a long
 // dataset can be worked through without going back to the grid.
+function prepareDatasetNext(){
+ const origin=page,root=state.project?.root,name=editor.name,filter=$('#image-filter').value,search=$('#image-search').value;
+ const size=Number($('#page-size').value)||24;
+ const index=items.findIndex(item=>item.name===name),position=paging.page*size+Math.max(0,index);
+ if(items[index+1])editor.prefetchImage(items[index+1].name).catch(()=>{});
+ const current=()=>page===origin&&state.project?.root===root&&editor.name===name&&$('#image-filter').value===filter&&$('#image-search').value===search;
+ return async()=>{
+  if(!current())return;
+  await loadImages();if(!current())return;
+  // Saved images disappear from pending/draft filters. Use the pre-save position,
+  // rather than finding the vanished image and accidentally restarting the list.
+  const removedFromFilter=filter==='pending'||filter==='unlabeled'||filter==='draft';
+  let target=position+(removedFromFilter?0:1);
+  const total=paging.total;
+  if(!total){toast('当前筛选下的图片已全部审核完成。');return;}
+  if(target>=total){
+   if(!removedFromFilter){toast('已保存并审核，已经是最后一张。');return;}
+   target=0;
+  }
+  const targetPage=Math.floor(target/size);
+  if(paging.page!==targetPage){paging.page=targetPage;await loadImages();}
+  if(!current())return;
+  const next=items[target%size];
+  if(next&&next.name!==name)await openImage(next.name);
+ };
+}
 async function navigate(step){
  if(!items.length)return;
+ const size=Number($('#page-size').value)||24;
  let index=items.findIndex(item=>item.name===editor.name);
  if(index<0)index=step>0?-1:items.length;
- const target=index+step;
- if(target>=0&&target<items.length){await openImage(items[target].name);return;}
- if(step>0){
-  if(paging.page>=paging.pages-1){toast('已经是筛选范围里的最后一张。');return;}
-  paging.page++;await loadImages();
-  if(items.length)await openImage(items[0].name);
-  return;
- }
- if(paging.page<=0){toast('已经是筛选范围里的第一张。');return;}
- paging.page--;await loadImages();
- if(items.length)await openImage(items[items.length-1].name);
+ const absolute=Math.max(0,Math.min(paging.total-1,paging.page*size+index+step));
+ const targetPage=Math.floor(absolute/size),targetIndex=absolute%size;
+ if(targetPage!==paging.page){paging.page=targetPage;await loadImages();}
+ if(items[targetIndex])await openImage(items[targetIndex].name);
 }
 async function jumpTo(edge){
  if(!items.length)return;
@@ -129,6 +187,7 @@ async function jumpTo(edge){
  else{paging.page=Math.max(0,paging.pages-1);await loadImages();if(items.length)await openImage(items[items.length-1].name);}
 }
 async function loadImages(){
+ if(page==='video'||page==='editor'&&window.videoTracking?.ownsTimeline())return items;
  const token=++loadSequence;
  // Tracked so a refresh that loses the race can wait for the winner instead of
  // reporting names from before the change (see below).
@@ -137,7 +196,7 @@ async function loadImages(){
   if(token!==loadSequence)return null;
   items=result.items;paging=result;$('#image-total').textContent=result.total+' 张图片';$('#page-number').textContent=(result.page+1)+' / '+result.pages;$('#prev-page').disabled=!result.page;$('#next-page').disabled=result.page>=result.pages-1;
   const gallery=$('#gallery');gallery.replaceChildren();
-  if(!items.length){const box=document.createElement('div');box.className='empty-gallery';const title=document.createElement('strong'),description=document.createElement('p');title.textContent=state.project?'没有符合筛选条件的图片':'还没有项目';description.textContent=state.project?'调整筛选条件或清除搜索词。':'新建项目后，图片、标注和训练结果会集中在一起。';box.append(title,description);if(!state.project){const action=document.createElement('button');action.className='primary';action.textContent='新建项目';action.onclick=()=>showNew();box.append(action);}gallery.append(box);}
+  if(!items.length){const box=document.createElement('div');box.className='empty-gallery';const title=document.createElement('strong'),description=document.createElement('p');const emptyProject=state.project&&state.project.counts.total===0;title.textContent=emptyProject?'项目已创建，尚未导入数据':state.project?'没有符合筛选条件的图片':'还没有项目';description.textContent=emptyProject?'点击“导入数据”添加图片或视频，之后开始标注。':state.project?'调整筛选条件或清除搜索词。':'先新建项目，再导入图片或视频。';box.append(title,description);if(emptyProject){const action=document.createElement('button');action.className='primary';action.textContent='导入数据';action.onclick=()=>$('#import-data').click();box.append(action);}if(!state.project){const action=document.createElement('button');action.className='primary';action.textContent='新建项目';action.onclick=()=>showNew();box.append(action);}gallery.append(box);}
   for(const item of items){const button=document.createElement('button');button.className='image-tile';button.setAttribute('aria-label','标注 '+item.name);const img=document.createElement('img');img.src=item.thumbnail;img.alt=item.name;const detail=document.createElement('div'),name=document.createElement('strong'),status=document.createElement('small');name.textContent=item.name;status.textContent={checked:'已审核',draft:'编辑中',unlabeled:'未标注'}[item.status];status.className=item.status;detail.append(name,status);
    // Removing from the grid too: an unusable photo is often spotted while
    // browsing, not only while annotating it.
@@ -157,15 +216,30 @@ async function loadImages(){
   return items;
  }finally{if(refreshPending===run)refreshPending=null;}
 }
-function renderFilmstrip(){const strip=$('#filmstrip');strip.replaceChildren();for(const item of items){const button=document.createElement('button');button.className='film-item'+(item.name===editor.name?' selected':'');const image=document.createElement('img');image.src=item.thumbnail;image.alt=item.name;const name=document.createElement('small');name.textContent=item.name;button.append(image,name);button.onclick=()=>openImage(item.name);strip.append(button);}}
+function renderFilmstrip(){
+ const strip=$('#filmstrip'),old=new Map([...strip.children].map(node=>[node.dataset.name,node])),keep=new Set();
+ for(const [index,item] of items.entries()){
+  let button=old.get(item.name);
+  if(!button){
+   button=document.createElement('button');button.dataset.name=item.name;
+   const image=document.createElement('img'),name=document.createElement('small');image.alt=item.name;name.textContent=item.name;
+   button.append(image,name);button.onclick=()=>openImage(item.name);
+  }
+  const image=button.querySelector('img');if(image.getAttribute('src')!==item.thumbnail)image.src=item.thumbnail;
+  button.className='film-item'+(item.name===editor.name?' selected':'');keep.add(button);
+  if(strip.children[index]!==button)strip.insertBefore(button,strip.children[index]||null);
+ }
+ for(const button of [...strip.children])if(!keep.has(button))button.remove();
+}
 function update(next){
- const previous=state;state=next;document.documentElement.dataset.theme=next.resolvedTheme||'dark';
+ if(state.project?.root!==next.project?.root)clearValidationVideo();
+ const previous=state;state=next;syncRemovalPreference();document.documentElement.dataset.theme=next.resolvedTheme||'dark';
  document.querySelectorAll('button[data-theme]').forEach(b=>b.classList.toggle('selected',b.dataset.theme===next.theme));
  $('#engine-state').textContent=next.ready?'本地引擎就绪':'启动本地引擎…';$('#engine-dot').classList.toggle('ready',!!next.ready);
  $('#notice').hidden=!next.error;$('#notice-text').textContent=next.error||'';
  const project=next.project,c=project?.counts||{total:0,checked:0,draft:0};
  $('#sidebar-project').textContent=project?.name||'选择或新建项目';$('#sidebar-task').textContent=taskNames[project?.task]||'支持五种视觉任务';
- $('#crumb-project').textContent=project?.name||'工作台';$('#project-title').textContent=project?.name||'从一组图片开始';$('#project-subtitle').textContent=project?'点击图片直接标注，审核后即可训练。三种方式可随时切换。':'选择任务、定义类别，然后直接在画布中标注。';
+ $('#crumb-project').textContent=project?.name||'工作台';$('#project-title').textContent=project?.name||'从一组图片开始';$('#project-subtitle').textContent=project?'点击“导入数据”追加图片或视频，标注审核后即可训练。':'选择任务、定义类别，然后直接在画布中标注。';
  $('#sidebar-count').textContent=c.total;$('#count-total').textContent=c.total;$('#count-checked').textContent=c.checked;$('#count-draft').textContent=c.draft;$('#count-pending').textContent=Math.max(0,c.total-c.checked-c.draft);$('#task-tag').textContent=taskNames[project?.task]||'尚未打开项目';$('#project-path').textContent=project?.root||'';
  $('#mode').value=project?.mode||'manual';document.querySelectorAll('[data-flow]').forEach(b=>b.classList.toggle('selected',b.dataset.flow===(project?.mode||'manual')));
  $('#training-ready').textContent=project?c.checked+' / '+c.total+' 张已审核': '请先建立项目并标注图片';$('#training-task').textContent=project?taskNames[project.task]+' · '+project.classes.join('、'):'';
@@ -175,6 +249,8 @@ function update(next){
  state.validationInfo=next.validation_info;state.trainingInfo=info;
  $('#training-status').textContent=trainingPending?'准备已审核数据快照…':({idle:'尚未开始',starting:'正在准备环境',training:'训练中',completed:'训练完成',failed:'训练失败',stopped:'已停止'}[info.status]||info.status);
  $('#training-run').textContent=info.error||info.run||'';
+ const used=info.dataset_counts;
+ $('#training-used-split').textContent=used?`本次训练使用 · 训练集 ${used.train} 张 · 验证集 ${used.val} 张 · 测试集 ${used.test||0} 张（未划分独立测试集）`:'本次训练使用 · 开始训练后显示实际数据数量';
  renderTrainingProgress(info);
  const logs=$('#training-log');const auto=$('#training-autoscroll').checked;const lines=info.logs||[];
  // Replacing the whole text on every poll would fight the user's scrolling, so
@@ -208,7 +284,8 @@ let trainingHistory=null;
 // rest of the story (environment, errors) but no numbers when verbose is off.
 function trainingProgress(info){
  const latest=trainingHistory?.latest;
- const total=Number(state.trainingInfo?.epochs)||0;
+ const total=Number(info.epochs)||0;
+ if(info.run&&latest?.run!==String(info.run).split(/[\\/]/).pop())return null;
  if(!latest||!latest.rows.length)return null;
  const columns=latest.columns;
  const index=name=>columns.findIndex(column=>column===name);
@@ -232,17 +309,28 @@ function renderTrainingProgress(info){
  const lines=info.logs||[],block=$('#training-progress');
  const parsed=trainingProgress(info);
  const running=['starting','training'].includes(info.status);
- const show=running||!!parsed||info.status==='completed'||info.status==='stopped';
+ const show=running||!!parsed||['completed','stopped','failed'].includes(info.status);
  block.hidden=!show;
  if(!show)return;
- const total=parsed?.total||0,epoch=parsed?.epoch||0;
- const ratio=total?Math.min(1,epoch/total):0;
+ const progress=info.progress,total=Number(progress?.epochs)||Number(info.epochs)||parsed?.total||0;
+ const epoch=Number(progress?.epoch)||parsed?.epoch||0;
+ const completed=Number(progress?.completed??parsed?.epoch??0);
+ const ratio=info.status==='completed'?1:total?Math.max(0,Math.min(.999,completed/total)):0;
  $('#training-progress-fill').style.width=(ratio*100).toFixed(1)+'%';
+ const bar=$('#training-progress-bar');bar.setAttribute('aria-valuenow',String(Math.round(ratio*100)));
  // Completed runs have no live progress, so the meter describes the newest
  // recorded run instead of pretending training is happening right now.
  $('#training-progress-text').textContent=running
-  ?(parsed?`第 ${epoch} / ${total||'?'} 轮 · 已完成 ${(ratio*100).toFixed(0)}% · 已记录 ${parsed.rows} 轮`:'正在准备第一轮…')
+  ?(epoch?`第 ${epoch} / ${total||'?'} 轮 · ${(ratio*100).toFixed(1)}%${progress?.batch?` · 本轮 ${progress.batch} / ${progress.batches} 批`:''}${progress?.phase==='validating'?' · 正在验证本轮结果':''}`:'正在准备第一轮…')
+  :info.status==='completed'?`训练完成 · 100% · 实际完成 ${Math.floor(completed)} / ${total||'?'} 轮${completed<total?'（提前结束）':''}`
+  :['failed','stopped'].includes(info.status)?`${info.status==='failed'?'训练失败':'训练已停止'} · 停在 ${(ratio*100).toFixed(1)}%`
   :(parsed?`最近一次训练：共 ${parsed.rows} 轮，展示第 ${epoch} 轮指标（${parsed.run}）`:'等待训练开始');
+ const now=Date.now()/1000,end=info.finished_at||now,elapsed=info.started_at?Math.max(0,end-info.started_at):null;
+ const remaining=progress?.eta_seconds==null?null:Math.max(0,Number(progress.eta_seconds)-Math.max(0,now-Number(progress.updated_at||now)));
+ $('#training-eta').textContent=running
+  ?(remaining>0?`预计剩余 ${trainingDuration(remaining)} · 预计完成 ${new Date((now+remaining)*1000).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false})}（按设定轮数估算，早停可能提前）`:(progress&&completed>=total?'正在完成最终验证和模型保存…':progress?.eta_seconds!=null?'预计完成时间：正在根据实际速度更新…':'预计完成时间：完成首轮后估算'))
+  :'';
+ $('#training-elapsed').textContent=elapsed===null?'':`已用时 ${trainingDuration(elapsed)}`;
  const strip=$('#training-metrics');strip.replaceChildren();
  for(const [label,number] of parsed?.metrics||[]){
   const cell=document.createElement('div');const strong=document.createElement('strong');const span=document.createElement('span');
@@ -250,6 +338,10 @@ function renderTrainingProgress(info){
   strong.textContent=/mAP|acc/i.test(label)?(number*100).toFixed(2)+'%':number.toFixed(4);
   span.textContent=label;cell.append(strong,span);strip.append(cell);
  }
+}
+function trainingDuration(seconds){
+ const value=Math.max(0,Math.ceil(seconds)),hours=Math.floor(value/3600),minutes=Math.floor(value%3600/60),secs=value%60;
+ return (hours?hours+'小时 ':'')+(minutes?minutes+'分 ':'')+secs+'秒';
 }
 let plotRequest=0,trainingPoll=null,splitKey='';
 async function refreshTrainingResults(force){
@@ -327,8 +419,10 @@ function renderValidation(info,project){
  $('#validate-stop').disabled=!running;
 }
 async function refreshValidationPlots(){
- if(!state.project){$('#validate-plots-wrap').hidden=true;$('#validate-history-wrap').hidden=true;return;}
+ if(!state.project){clearValidationVideo();$('#validate-plots-wrap').hidden=true;$('#validate-history-wrap').hidden=true;return;}
+ const projectRoot=state.project.root;
  const records=await api.validationHistory().catch(()=>[]);
+ if(state.project?.root!==projectRoot)return;
  const history=$('#validate-history'),wrap=$('#validate-history-wrap');
  history.replaceChildren();
  wrap.hidden=!records.length;
@@ -339,14 +433,30 @@ async function refreshValidationPlots(){
   const metrics=record.metrics||{};
   const headline=metrics['mAP@0.5']??metrics['掩膜 mAP@0.5']??metrics['关键点 mAP@0.5']??metrics['旋转框 mAP@0.5']??metrics['Top-1 准确率'];
   score.textContent=headline!=null?('mAP/准确率 '+(headline*100).toFixed(1)+'%'):'—';
-  const open=document.createElement('button');open.type='button';open.className='text-button';open.textContent='查看结果图';
+  const open=document.createElement('button');open.type='button';open.className='text-button';open.textContent=record.video?'播放结果视频':'查看结果图';
   open.onclick=()=>{state.validationMetrics=metrics;renderValidation(state.validationInfo,state.project);showValidationPlots(record);};
   row.append(when,score,open);history.append(row);
  }
  const latest=records[0];
  if(latest)showValidationPlots(latest);
+ else clearValidationVideo();
+}
+let validationVideoToken=0;
+function clearValidationVideo(){
+ ++validationVideoToken;const video=$('#validation-video');video.pause();video.removeAttribute('src');video.load();$('#validation-video-wrap').hidden=true;
+}
+async function showValidationVideo(record){
+ if(!record?.video){clearValidationVideo();return;}
+ const token=++validationVideoToken,root=state.project?.root,video=$('#validation-video');
+ try{
+  const asset=await api.resultVideo('validation/'+record.id+'/'+record.video);
+  if(token!==validationVideoToken||root!==state.project?.root)return;
+  if(video.getAttribute('src')!==asset.url){video.pause();video.src=asset.url;video.load();}
+  $('#validation-video-wrap').hidden=false;$('#validation-video-note').textContent='逐帧模型预测 · 可暂停、拖动进度和全屏查看 · 结果视频不含原音轨';
+ }catch(error){if(token===validationVideoToken){clearValidationVideo();toast('结果视频读取失败：'+error.message);}}
 }
 async function showValidationPlots(record){
+ showValidationVideo(record);
  const wrap=$('#validate-plots-wrap'),grid=$('#validate-plots');
  const names=Array.isArray(record?.plots)?record.plots.map(entry=>typeof entry==='string'?entry:entry.name):[];
  if(!names.length){wrap.hidden=true;return;}
@@ -429,13 +539,22 @@ $('#close-project-dialog').onclick=()=>$('#project-dialog').close();
 document.querySelectorAll('[data-task]').forEach(b=>b.onclick=()=>chooseTask(b.dataset.task));
 $('#new-name').oninput=()=>{if(!newRootEdited)$('#new-root').value=projectsHome+'/'+($('#new-name').value.trim().replace(/[\\/:*?"<>|]/g,'_')||'我的项目');};
 $('#new-root').oninput=()=>newRootEdited=true;
-for(const [id,kind,target] of [['#choose-source','source','#new-source'],['#choose-root','root','#new-root']])$(id).onclick=async()=>{const path=await api.choose(kind);if(path){$(target).value=path;if(kind==='root')newRootEdited=true;}};
+$('#choose-root').onclick=async()=>{const path=await api.choose('root');if(path){$('#new-root').value=path;newRootEdited=true;}};
 $('#new-preset').onchange=()=>{$('#custom-template').hidden=$('#new-preset').value!=='custom';if(['目标','person','dog'].includes($('#new-classes').value))$('#new-classes').value=$('#new-preset').value==='dog'?'dog':'person';};
 function pairs(text){return text.trim()?text.split(/[,，]/).filter(s=>s.trim()).map(s=>{const match=s.trim().match(/^(\d+)\s*-\s*(\d+)$/);if(!match)throw new Error('连接或对称请使用编号，例如 1-2, 2-3');return [Number(match[1])-1,Number(match[2])-1];}):[];}
-$('#project-form').onsubmit=async e=>{e.preventDefault();$('#project-error').textContent='';$('#create-project').disabled=true;$('#create-project').textContent='正在导入副本…';try{const args={name:$('#new-name').value.trim(),task:newTask,classes:$('#new-classes').value.split(/[,，\n]/).map(s=>s.trim()).filter(Boolean),root:$('#new-root').value.trim(),source:$('#new-source').value.trim(),preset:$('#new-preset').value};if(newTask==='pose'&&args.preset==='custom')args.template={points:$('#new-points').value.split('\n').map(s=>s.trim()).filter(Boolean),edges:pairs($('#new-edges').value),pairs:pairs($('#new-pairs').value)};await rpc('create_project',args);$('#project-dialog').close();await api.state().then(update);paging.page=0;await loadImages();await go('editor');toast('项目已建立，原始图片保留。');}catch(error){$('#project-error').textContent=error.message;}finally{$('#create-project').disabled=false;$('#create-project').textContent='创建项目并开始标注';}};
+$('#project-form').onsubmit=async e=>{
+ e.preventDefault();$('#project-error').textContent='';$('#create-project').disabled=true;$('#create-project').textContent='正在创建…';
+ try{
+  const args={name:$('#new-name').value.trim(),task:newTask,classes:$('#new-classes').value.split(/[,，\n]/).map(s=>s.trim()).filter(Boolean),root:$('#new-root').value.trim(),preset:$('#new-preset').value};
+  if(newTask==='pose'&&args.preset==='custom')args.template={points:$('#new-points').value.split('\n').map(s=>s.trim()).filter(Boolean),edges:pairs($('#new-edges').value),pairs:pairs($('#new-pairs').value)};
+  await rpc('create_project',args);$('#project-dialog').close();await api.state().then(update);paging.page=0;galleryKey='';$('#image-filter').value='all';$('#image-search').value='';await loadImages();
+  if(!window.videoTracking?.createdProject())await go('data');
+  toast('空项目已创建，点击“导入数据”添加图片或视频。');
+ }catch(error){$('#project-error').textContent=error.message;}
+ finally{$('#create-project').disabled=false;$('#create-project').textContent='创建项目';}
+};
 $('#add-class').onclick=()=>{if(!state.project)return toast('请先建立项目。');$('#text-value').value='';$('#text-error').textContent='';$('#text-dialog').showModal();};
-$('#auto-approve').checked=autoApprove();
-$('#auto-approve').onchange=e=>{setAutoApprove(e.target.checked);toast(e.target.checked?'“保存草稿”现在会直接标记为已审核。':'已改为只保存草稿，需要手动确认审核。');};
+$('#auto-approve').checked=true;
 $('#text-cancel').onclick=()=>$('#text-dialog').close();
 $('#text-form').onsubmit=async e=>{e.preventDefault();try{const name=$('#text-value').value.trim();await rpc('add_class',{name});await api.state().then(update);editor.activeClass=name;$('#active-class').value=name;$('#text-dialog').close();toast('已追加类别：'+name);}catch(error){$('#text-error').textContent=error.message;}};
 $('#image-filter').onchange=()=>{paging.page=0;loadImages();};$('#image-search').oninput=()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>{paging.page=0;loadImages();},250);};$('#refresh-images').onclick=loadImages;
@@ -445,18 +564,30 @@ function splitArgs(){return {split_mode:$('#split-mode').value,split_ratio:Numbe
 // The state publisher runs about once a second, so this must stay idempotent: an
 // earlier "newest call wins" guard rejected every write because each update
 // bumped the counter while the previous response was still in flight.
+let splitPending=null;
+function splitPreviewKey(){return JSON.stringify([state.project?.root,state.project?.counts,splitArgs()]);}
+function showSplitPreview(text,title=''){
+ $('#split-summary').textContent=text;$('#split-summary').title=title;
+ $('#training-split-summary').textContent='当前数据预计划分 · '+text;
+ $('#training-split-summary').title=title;
+}
 async function refreshSplitPreview(){
- if(!state.project){$('#split-summary').textContent='尚未打开项目';return;}
+ if(!state.project){splitKey='';showSplitPreview('尚未打开项目');return;}
  if(!state.ready)return;
- const key=JSON.stringify([state.project.root,splitArgs()]);
+ const key=splitPreviewKey();
  if(key===splitKey)return;
+ if(splitPending?.key===key)return splitPending.promise;
+ showSplitPreview('正在计算当前已审核数据…');
+ const operation=(async()=>{
  try{
   const preview=await rpc('split_preview',splitArgs());
-  if(!state.project||JSON.stringify([state.project.root,splitArgs()])!==key)return;
+  if(!state.project||splitPreviewKey()!==key)return;
   splitKey=key;
-  $('#split-summary').textContent=preview.ready?('训练 '+preview.train+' 张 · 验证 '+preview.val+' 张（已审核 '+preview.images+' 张）'):('已审核图片不足，当前 '+preview.images+' 张');
-  $('#split-summary').title=preview.ready?'':'至少需要 2 张内容不同的已审核图片';
- }catch(error){$('#split-summary').textContent=error.message;}
+  showSplitPreview(`训练集 ${preview.train} 张 · 验证集 ${preview.val} 张 · 测试集 0 张（已审核 ${preview.images} 张）`,preview.ready?'未划分独立测试集；可在验证页选择自选文件夹测试。':'至少需要 2 张内容不同的已审核图片才能训练。未划分独立测试集。');
+ }catch(error){if(splitPreviewKey()===key)showSplitPreview(error.message);}
+ })();
+ splitPending={key,promise:operation};
+ try{await operation;}finally{if(splitPending?.promise===operation)splitPending=null;}
 }
 $('#training-form').onsubmit=async e=>{e.preventDefault();trainingPending=true;$('#train-start').disabled=true;$('#training-status').textContent='准备已审核数据快照…';try{await editor.save();const args={model:$('#train-model').value,device:$('#train-device').value,lr0:Number($('#train-lr0').value),optimizer:$('#train-optimizer').value,amp:$('#train-amp').checked};for(const name of ['epochs','batch','imgsz','workers','patience'])args[name]=Number($('#train-'+name).value);for(const [id,key] of [['lrf','lrf'],['weight-decay','weight_decay'],['momentum','momentum'],['iou','iou'],['confidence','conf'],['mosaic','mosaic'],['mixup','mixup'],['scale','scale'],['translate','translate'],['fliplr','fliplr'],['hsv-h','hsv_h'],['hsv-s','hsv_s'],['hsv-v','hsv_v']])args[key]=Number($('#train-'+id).value);Object.assign(args,splitArgs());await rpc('start_training',args);toast('训练已启动，使用已审核数据快照。');}catch(error){toast(error.message);}finally{trainingPending=false;api.state().then(update);}};
 $('#train-stop').onclick=async()=>{if(confirm('停止当前训练？已保存的检查点会保留。'))try{await rpc('stop_training');}catch(e){toast(e.message);}};
@@ -549,7 +680,7 @@ const HELP={
  validate:{title:'模型验证',body:[
   ['验证在做什么','拿一份模型没学过的数据跑一遍，算出 mAP、精确率、召回率，并生成混淆矩阵和预测示例，判断模型到底能不能用。'],
   ['和训练时的区别','训练里的验证是顺带打分；这里是拿固定数据独立复测，方便比较不同权重、不同轮数的模型。'],
-  ['验证对象怎么选','· 训练时冻结的验证集：和训练分数同一口径，最适合横向比较。\n· 自选文件夹：把别的项目或新拍的图片复制一份进来当测试集，原文件不动。\n· 单张图片：快速看一张图的预测效果。\n· 视频：按固定间隔抽帧后逐帧预测，适合看连续场景。'],
+  ['验证对象怎么选','· 训练时冻结的验证集：和训练分数同一口径，最适合横向比较。\n· 自选文件夹：把别的项目或新拍的图片复制一份进来当测试集，原文件不动。\n· 单张图片：快速看一张图的预测效果。\n· 视频：逐帧预测并生成带标记的可播放视频，支持暂停和拖动进度；截图间隔只影响结果截图，视频不含原音轨。'],
   ['指标怎么看','mAP50 越高越好；mAP50-95 更严格，会把框的贴合程度也算进去。精确率高说明误报少，召回率高说明漏检少，两者常此消彼长，按任务取舍。'],
   ['置信度阈值 conf','模型认为“这里有目标”的最低把握，默认 0.25。调高只保留很确定的框，误报少但容易漏；调低框更多，漏检少但误报多。评估模型真实水平时保持默认，便于和别人对比。'],
   ['IoU 阈值 iou','判定“两个框是同一个目标”的重叠比例门槛，默认 0.7。重叠超过这个比例就只保留分数最高的那个（非极大值抑制）。\n· 目标密集、互相遮挡（人群、货架）：调到 0.4~0.6，避免把挨在一起的目标合并掉。\n· 目标大而稀疏：保持 0.7 或略高。\n它只影响去重，不改变模型本身；换一个 IoU 复测指标就会变，所以两次对比请用同一个值。'],
@@ -606,6 +737,7 @@ document.addEventListener('keydown',event=>{if(event.key==='Escape'){const form=
 /* Global shortcuts. Editor-local keys (V/R/1-9/Ctrl+S/Ctrl+Z) live in
    editor.js; these cover page switching and working through the image list. */
 document.addEventListener('keydown',event=>{
+ if(event.defaultPrevented)return;
  const typing=/INPUT|TEXTAREA|SELECT/.test(event.target.tagName)||event.target.isContentEditable;
  const dialogOpen=!!document.querySelector('dialog[open]');
  const meta=event.ctrlKey||event.metaKey;
@@ -623,8 +755,8 @@ document.addEventListener('keydown',event=>{
   if(event.key==='ArrowDown'||event.key==='PageDown'){event.preventDefault();navigate(1);return;}
   if(event.key==='Home'){event.preventDefault();jumpTo('first');return;}
   if(event.key==='End'){event.preventDefault();jumpTo('last');return;}
-  if(event.key==='Enter'){event.preventDefault();editor.approve();return;}
-  if(meta&&event.key.toLowerCase()==='s'){event.preventDefault();editor.save().then(()=>toast('草稿已保存。')).catch(e=>toast(e.message));return;}
+  if(event.key==='Enter'){event.preventDefault();if(!event.repeat)editor.approve();return;}
+  if(meta&&event.key.toLowerCase()==='s'){event.preventDefault();editor.approve();return;}
  }
  if(onList){
   if(event.key==='+'||event.key==='='){event.preventDefault();showNew().catch(e=>toast(e.message));return;}

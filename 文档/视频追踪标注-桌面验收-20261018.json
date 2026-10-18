@@ -1,0 +1,27 @@
+{
+  "checks": [
+    "dedicated video page is available",
+    "video project form preserves chosen source",
+    "new project returns to tracking workflow",
+    "lazy import materializes only first frame",
+    "empty seed cannot start tracking",
+    "running worker locks canvas and offers pause",
+    "backend refuses edits while propagation runs",
+    "cut automatically opens exact problem frame",
+    "no future frames are generated after failure",
+    "automatic outputs stay unreviewed with provenance",
+    "manual correction resumes to final frame",
+    "propagated object follows new scene",
+    "unchecked automatic seed requires review",
+    "forward seek reaches existing end without replacing annotation",
+    "session list persists progress",
+    "small window controls stay within viewport",
+    "manual pause preserves clip and allows editing",
+    "sessions restore after renderer reload",
+    "native pose seed has visible occluded and skipped keypoints",
+    "pose propagation preserves group visibility and omitted point",
+    "visible landmark actually moves with video",
+    "interrupted session shows recovery instead of running forever"
+  ],
+  "errors": []
+}

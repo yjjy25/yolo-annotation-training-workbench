@@ -21,7 +21,7 @@ module.exports=async({win,app,backend,request,diagnostics,ready,testRoot})=>{
    await evaluate("go('data')");await request('create_project',{root:project,name:'发行包多实例验收 '+task,task,classes,source,preset:'dog'});
    await pause(300);await click('.nav-item[data-page=editor]');await wait(()=>evaluate(`editor.project?.root===${JSON.stringify(project)}&&!!editor.image`));await pause(350);
    for(let image=0;image<2;image++){
-    for(let i=0;i<2;i++){await click('#class-shortcuts button:nth-child('+(i+1)+')');await draw(i?[34,7]:[5,5],i?[60,58]:[29,57]);}
+    for(let i=0;i<2;i++){await click('#class-shortcuts button:nth-child('+(i+1)+')');await click('#tool-draw');await draw(i?[34,7]:[5,5],i?[60,58]:[29,57]);}
     await click('#save-annotation');await wait(()=>evaluate('!editor.dirty&&!editor.saving'));
     const annotation=JSON.parse(fs.readFileSync(path.join(project,'annotations','image_'+image+'.json'),'utf8'));
     const boxes=annotation.shapes.filter(s=>s.shape_type==='rectangle');
@@ -29,7 +29,7 @@ module.exports=async({win,app,backend,request,diagnostics,ready,testRoot})=>{
     for(let i=0;i<boxes.length;i++){const a=i?[34,7]:[5,5],b=i?[60,58]:[29,57];if(boxes[i].points[0].some((v,j)=>Math.abs(v-a[j])>1)||boxes[i].points[2].some((v,j)=>Math.abs(v-b[j])>1))throw new Error('Saved box differs from pointer release position: '+JSON.stringify(boxes[i].points));}
     if(task==='pose'&&(new Set(boxes.map(s=>s.group_id)).size!==2||annotation.shapes.filter(s=>s.shape_type==='point').length!==48))throw new Error('Pose groups not independent');
     if(image===0){await pause(300);fs.writeFileSync(path.join(testRoot,task+'.png'),(await win.webContents.capturePage()).toPNG());}
-    await click('#approve-annotation');await wait(()=>evaluate(`editor.name==='image_${image+1}.png'`));await pause(200);
+    await wait(()=>evaluate(`editor.name==='image_${image+1}.png'&&!editor.approving`));await pause(200);
    }
    result.stage=task+' training';save();
    const started=await request('start_training',{model:task==='pose'?'yolov8n-pose.pt':'yolov8n.pt',device,epochs:1,batch:2,imgsz:64,workers:0,patience:1,lr0:.01,amp:false});

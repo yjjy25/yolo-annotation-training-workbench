@@ -302,6 +302,9 @@ def test_train_runs_with_only_worker_payload_and_framework_modules(
     calls = {}
 
     class FakeYOLO:
+        def add_callback(self, name, callback):
+            calls.setdefault("callbacks", {})[name] = callback
+
         def __init__(self, model):
             calls["model"] = model
 

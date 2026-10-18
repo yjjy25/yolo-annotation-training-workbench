@@ -59,10 +59,10 @@ module.exports=async({win,app,backend,request,diagnostics,ready,root})=>{
   const choose=async(selector,value)=>evaluate(`(()=>{const s=document.querySelector(${JSON.stringify(selector)});s.value=${JSON.stringify(value)};s.dispatchEvent(new Event('change',{bubbles:true}));})()`);
   for(const preset of ['dog','custom']){
    await click('#new-project');await click('[data-task=pose]');await choose('#new-preset',preset);
-   const location=path.join(qaRoot,preset);await fill('#new-name','骨点界面验收 '+preset);await fill('#new-classes',preset==='dog'?'狗':'机械臂');await fill('#new-source',path.join(root,'.runtime','smoke-v2','pose','images'));await fill('#new-root',location);
+   const location=path.join(qaRoot,preset);await fill('#new-name','骨点界面验收 '+preset);await fill('#new-classes',preset==='dog'?'狗':'机械臂');await fill('#new-root',location);
    if(preset==='custom'){await fill('#new-points','底座\n关节\n末端');await fill('#new-edges','1-2, 2-3');}
    if(preset==='custom')await screenshot('Studio-NewProject-Pose.png');
-   await click('#create-project');await wait(()=>evaluate(`editor.project?.root===${JSON.stringify(location)}&&!!editor.image&&page==='editor'&&!document.querySelector('#project-dialog').open`));await pause(350);
+   await click('#create-project');await wait(()=>evaluate(`!document.querySelector('#project-dialog').open`));await request('import_images',{path:path.join(root,'.runtime','smoke-v2','pose','images')});await evaluate("api.state().then(update).then(()=>loadImages()).then(()=>go('editor'))");await wait(()=>evaluate(`editor.project?.root===${JSON.stringify(location)}&&!!editor.image&&page==='editor'&&!document.querySelector('#project-dialog').open`));await pause(350);
    const length=await evaluate('editor.project.template.points.length');if(length!==(preset==='dog'?24:3))throw new Error('Pose template count incorrect');
    await wait(()=>evaluate("document.querySelector('#predict-model').value===''"));
    const coords=await evaluate("(()=>{const r=editor.canvas.getBoundingClientRect();return [[18,18],[76,76]].map(p=>({x:Math.round(r.x+editor.offset[0]+p[0]*editor.zoom),y:Math.round(r.y+editor.offset[1]+p[1]*editor.zoom)}));})()");

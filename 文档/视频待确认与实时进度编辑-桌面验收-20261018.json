@@ -1,0 +1,26 @@
+{
+  "checks": [
+    "first video frame stays outside the dataset",
+    "video editing stays under video navigation",
+    "timeline addresses every original frame",
+    "saving and auto-review never publish a video draft",
+    "progress bar remains interactive during live playback",
+    "scrubbing updates the video before releasing the mouse",
+    "dragging progress during playback pauses and opens the exact editable frame",
+    "unsampled raw frame keeps point visibility and omitted point",
+    "point is immediately editable after scrubbing",
+    "scrubbing away and back preserves manual correction",
+    "corrected seed resumes forward to scene-cut pause",
+    "all tracked outputs still remain outside dataset",
+    "explicit confirmation transfers exactly one reviewed frame",
+    "confirmation keeps the user inside video review",
+    "repeated confirmation is idempotent",
+    "dataset gallery contains only explicitly accepted frames",
+    "dataset copy has the corrected point and independent image controls",
+    "video list retains review progress and draft frames",
+    "untracked future frame opens empty for manual annotation",
+    "timeline and confirmation controls fit small window",
+    "reload restores selected raw frame and independent dataset count"
+  ],
+  "errors": []
+}

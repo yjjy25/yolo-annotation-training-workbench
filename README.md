@@ -1,11 +1,23 @@
-# YOLO 标注训练一体化工具 0.4.1
+# YOLO 标注训练一体化工具 0.5.0
 
-基于完整 X-AnyLabeling 4.1.3 源码扩展，使用 Electron 外壳。标注、模型辅助、人工审查和训练在同一个窗口完成。
+基于完整 X-AnyLabeling 4.1.3 源码扩展，使用 Electron 外壳。标注、视频追踪、模型验证和训练在同一个窗口完成。
+
+**0.5.0 包含本轮标注、视频追踪、视频验证及训练进度更新。提供 Windows / Ubuntu 自带运行库安装包与对应源码。**
+
+## 这次更新
+
+- 独立视频追踪：标注首帧后自动传播，目标丢失时暂停；支持播放、进度拖动和贴边框尺寸变化。结果送到“视频待微调”复核，保存成功即加入数据集并自动下一张。
+- 标注交互：骨点可拖动微调，模板可镜像/反转，照片示例显示对应点位；Tab 切换类别，提供遮挡和跳过快捷键。
+- 连续保存：合并重复请求、复用缩略图并预读下一张，减少黑屏和等待。数据集及视频微调区均支持预览与移除。
+- 训练：实时进度条、当前轮次/批次、预计剩余时间和完成时刻；显示当前划分与本次训练实际使用的数据数量。
+- 视频验证：逐帧预测并生成带标记的视频，支持播放、暂停、拖动进度和全屏查看。目前输出不含原音轨。
+
+完整内容见 [更新记录](CHANGELOG.md)，操作规范见 [姿态标注规范](文档/姿态标注规范.md)。
 
 ## 下载与启动
 
-- Windows 10/11 x64：[下载 Windows 离线安装包分卷](https://github.com/yjjy25/yolo-annotation-training-workbench/releases/tag/v0.4.1)。运行后选择位置并解压安装，可创建桌面快捷方式。包含独立 Python、Electron、CPU/CUDA 训练组件，无需另装 Python。程序可整体移动，移动前先退出。
-- Ubuntu x86_64：[下载 Ubuntu DEB 安装包分卷](https://github.com/yjjy25/yolo-annotation-training-workbench/releases/tag/v0.4.1)。通过软件安装器打开；也可执行 `sudo apt install ./AnnotationWorkbench-0.4.1-Ubuntu-amd64.deb`。安装后在应用菜单找到“标注训练工作台”。系统图形库缺失时由 apt 补齐。
+- Windows 10/11 x64：[下载 Windows 离线安装包分卷](https://github.com/yjjy25/yolo-annotation-training-workbench/releases/tag/v0.5.0)。运行后选择位置并解压安装，可创建桌面快捷方式。包含独立 Python、Electron、CPU/CUDA 训练组件，无需另装 Python。程序可整体移动，移动前先退出。
+- Ubuntu x86_64：[下载 Ubuntu DEB 安装包分卷](https://github.com/yjjy25/yolo-annotation-training-workbench/releases/tag/v0.5.0)。通过软件安装器打开；也可执行 `sudo apt install ./AnnotationWorkbench-0.5.0-Ubuntu-amd64.deb`。安装后在应用菜单找到“标注训练工作台”。系统图形库缺失时由 apt 补齐。
 - 源码运行：先按下方“源码开发”准备环境，再双击 `双击启动.vbs` 或运行 `bash start.sh`。
 
 完整离线包超过 GitHub 单文件限制，需要先合并分卷：
@@ -83,6 +95,12 @@ Windows 和 Ubuntu 是不同文件，不能互相替代。离线包体积较大�
 
 便携离线二进制包使用 `.packaging/构建说明.md` 的独立构建流程，不能直接把源码 ZIP 改名为 EXE。Windows 程序整体移动前请退出，项目及设置位于程序旁“工作台数据”；DEB 安装是系统安装，项目及设置位于用户配置目录。
 
-上传 GitHub 请使用 `发行包/源码/AnnotationWorkbench-0.4.1` 内的干净源码，保留 LICENSE、THIRD_PARTY_NOTICES.md 和上游版权。个人项目、备份、运行库、权重和大型发行包已排除；不要直接上传整个开发目录。安装包放在 Releases。完整版超过 GitHub 单个 Release 文件 2 GiB 限制，使用 `发行包/GitHub-Releases` 中的分卷、parts.json 和 join.py；用户下载同一平台的全部分卷及校验清单后运行 `powershell -ExecutionPolicy Bypass -File .\join.ps1` 或 `bash join.sh Ubuntu`（也提供 Python 重组脚本），将验证 SHA256 并合成原安装包。
+上传 GitHub 请使用 `.packaging/package_source.py` 生成的干净源码目录，保留 LICENSE、THIRD_PARTY_NOTICES.md 和上游版权。个人项目、备份、运行库、权重和大型发行包已排除；不要直接上传整个开发目录。安装包放在 Releases。完整版超过 GitHub 单个 Release 文件 2 GiB 限制，使用 `发行包/GitHub-Releases` 中的分卷、parts.json 和 join.py；用户下载同一平台的全部分卷及校验清单后运行 `powershell -ExecutionPolicy Bypass -File .\join.ps1` 或 `bash join.sh Ubuntu`（也提供 Python 重组脚本），将验证 SHA256 并合成原安装包。
 
-0.4.1 修改与当前验证范围见 [发布检查记录](文档/0.4.1_发布检查.md)。已在现有 Windows 与 WSLg 环境验证的内容不代表全部模型、硬件和 Linux 发行版均已验收。
+0.5.0 安装包与当前验证范围见 [发布检查记录](文档/0.5.0_发布检查.md)。已在现有 Windows 与 WSLg 环境验证的内容不代表全部模型、硬件和 Linux 发行版均已验收。
+
+## 视频与姿态标注扩展（源码）
+
+支持视频抽帧后逐帧标注、顺序点选时直接拖动已有骨点、跳过与遮挡快捷键、模板左右镜像/上下反转，以及项目照片示例与编号点位规范。使用方法见 [姿态标注规范](文档/姿态标注规范.md)。这些功能已纳入 0.5.0。
+
+保存审核时复用缩略图、预读下一张图片，并将视频审核后的列表同步移出切图等待流程，减少黑屏和等待。720×1280 图片副本的保存切图实测及验证范围见 [保存切图性能修复](文档/保存切图性能修复_20261018.md)。这些修复已纳入 0.5.0。

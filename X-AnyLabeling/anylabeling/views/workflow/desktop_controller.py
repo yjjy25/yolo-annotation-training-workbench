@@ -21,6 +21,9 @@ class DesktopController(QtCore.QObject):
         self.validation={"status":"idle","logs":[],"run":None,"metrics":None}
         self.validation_job=None
         self.validation_buffer=""
+        self.video_job=None
+        self.video_payload=None
+        self.video_kind="import"
         # NMS thresholds from the training page. They are deliberately not part of
         # the training payload; they are kept here so the validate page can reuse
         # the value the user last typed.
@@ -33,6 +36,10 @@ class DesktopController(QtCore.QObject):
 
     def call(self,method,args):
         if method=="prepare_exit":
+            self.stop_video()
+            if self.video_job and not self.video_job.waitForFinished(2000):
+                self.video_job.kill()
+                self.video_job.waitForFinished(1000)
             self.stop_training()
             self.stop_validation()
             self.workflow.stop_predict()
@@ -62,7 +69,78 @@ class DesktopController(QtCore.QObject):
             return True
         if method=="load_annotation":
             return storage.load_annotation(self.project(),args["name"])
+        if method=="import_video":
+            return self.start_video(args)
+        if method=="video_status":
+            return self.video_status()
+        if method=="stop_video":
+            self.stop_video()
+            return True
+        if method=="video_sequences":
+            from anylabeling.services.workflow.video import sequences
+            return sequences(self.project())
+        if method=="create_tracking":
+            self.ensure_switchable()
+            from anylabeling.services.workflow.tracking import create_session
+            result=create_session(self.project(),args)
+            self.workflow.last_count=None
+            return result
+        if method=="import_images":
+            self.ensure_switchable()
+            from anylabeling.services.workflow.import_data import import_images
+            result=import_images(self.project(),args)
+            self.workflow.last_count=None
+            return result
+        if method=="start_tracking":
+            return self.start_tracking(args)
+        if method=="seek_tracking":
+            self.stop_video()
+            if self.video_job and self.video_job.state()!=QtCore.QProcess.ProcessState.NotRunning:
+                if not self.video_job.waitForFinished(4000):raise ValueError("正在暂停追踪，请稍后再次定位。")
+            self.ensure_switchable()
+            from anylabeling.services.workflow.video_workspace import seek_frame
+            return seek_frame(self.project(),args)
+        if method=="remove_tracking_drafts":
+            self.ensure_switchable()
+            from anylabeling.services.workflow.video_workspace import remove_drafts
+            return remove_drafts(self.project(),args)
+        if method=="queue_tracking_review":
+            self.ensure_switchable()
+            from anylabeling.services.workflow.video_workspace import queue_review
+            return queue_review(self.project(),args)
+        if method=="accept_tracking_frame":
+            self.ensure_switchable()
+            from anylabeling.services.workflow.video_workspace import accept_frame
+            result=accept_frame(self.project(),args)
+            self.workflow.last_count=None
+            return result
+        if method=="advance_tracking":
+            self.ensure_switchable()
+            from anylabeling.services.workflow.tracking import advance_session
+            result=advance_session(self.project(),args)
+            self.workflow.last_count=None
+            return result
+        if method=="tracking_status":
+            return self.video_status() if self.video_kind=="tracking" else {"status":"idle"}
+        if method in {"tracking_preview","ack_tracking_preview"}:
+            from anylabeling.services.workflow.project import read_json
+            if self.video_kind!="tracking" or not self.video_payload:
+                return None
+            payload=read_json(self.video_payload)
+            if Path(payload["root"]).resolve()!=self.project().root:
+                return None
+            frame=args.get("frame")
+            if type(frame) is not int or frame<0:return None
+            path=self.video_payload.with_name(f"preview-{frame}.json")
+            if not path.exists():return None
+            value=read_json(path)
+            if method=="tracking_preview":return value
+            if type(args.get("frame")) is not int or args["frame"]!=value["frame"]:
+                raise ValueError("预览帧已变化，请重新播放当前帧。")
+            self.video_payload.with_name(f"preview-ack-{frame}").touch()
+            return True
         if method=="save_annotation":
+            self.ensure_video_idle()
             result=storage.save_annotation(self.project(),args["name"],args["annotation"],args.get("base_hash"),args.get("checked",False))
             self.workflow.last_count=None
             # Keep the original advanced editor in sync with the same files.
@@ -71,6 +149,7 @@ class DesktopController(QtCore.QObject):
                     self.workflow.view.load_file(self.workflow.view.image_path)
             return result
         if method=="remove_image":
+            self.ensure_video_idle()
             result=storage.remove_image(self.project(),args["name"],args.get("purge",False))
             self.workflow.last_count=None
             # The advanced editor must let go of the file it was showing, otherwise
@@ -187,6 +266,7 @@ class DesktopController(QtCore.QObject):
         return [str(name) for name in names]
 
     def ensure_switchable(self):
+        self.ensure_video_idle()
         if self.workflow.view.dirty:
             raise ValueError("高级标注有未保存的修改，请先保存后再操作。")
         dialog=self.workflow.view.training_dialog
@@ -196,6 +276,61 @@ class DesktopController(QtCore.QObject):
             raise ValueError("预标注正在运行，请完成或停止后再切换项目。")
         if self.job and self.job.state()!=QtCore.QProcess.ProcessState.NotRunning:
             raise ValueError("训练正在运行，请完成或停止后再切换项目。")
+
+    def ensure_video_idle(self):
+        if self.video_job and self.video_job.state()!=QtCore.QProcess.ProcessState.NotRunning:
+            raise ValueError("视频任务正在运行，请先暂停，再编辑标注、切换项目或启动训练。")
+
+    def start_tracking(self,args):
+        from anylabeling.services.workflow.tracking import session, seed_data
+        import uuid
+        self.ensure_switchable()
+        mode=args.get("mode","direct")
+        if mode not in {"play","direct"}:raise ValueError("请选择有效的运行方式。")
+        project=self.project()
+        record=session(project,args["id"])
+        _,seed_hash=seed_data(project,record,args["name"])
+        folder=project.root/"videos"/("tracking_job_"+uuid.uuid4().hex)
+        self.video_kind="tracking"
+        self.video_payload=folder/"payload.json"
+        write_json(self.video_payload,{"root":str(project.root),"id":record["id"],"name":args["name"],"seed_hash":seed_hash,"mode":mode})
+        write_json(folder/"progress.json",{"status":"running","id":record["id"],"name":args["name"],"generated":0,"mode":mode,"message":"正在定位起始帧…"})
+        self.video_job=QtCore.QProcess(self)
+        self.video_job.setWorkingDirectory(str(Path(__file__).resolve().parents[3]))
+        self.video_job.finished.connect(lambda *_:setattr(self.workflow,"last_count",None))
+        self.video_job.start(sys.executable,["-u","-m","anylabeling.services.workflow.tracking",str(self.video_payload)])
+        return {"status":"running","id":record["id"],"mode":mode}
+
+    def start_video(self,args):
+        from anylabeling.services.workflow.video import options
+        import uuid
+        self.ensure_switchable()
+        if self.workflow.process and self.workflow.process.state()!=QtCore.QProcess.ProcessState.NotRunning:
+            raise ValueError("预标注运行中，请稍后导入视频。")
+        options(args)
+        project=self.project()
+        self.video_kind="import"
+        folder=project.root/"videos"/("job_"+uuid.uuid4().hex)
+        self.video_payload=folder/"payload.json"
+        write_json(self.video_payload,{**args,"root":str(project.root)})
+        write_json(folder/"progress.json",{"status":"running","count":0})
+        self.video_job=QtCore.QProcess(self)
+        self.video_job.setWorkingDirectory(str(Path(__file__).resolve().parents[3]))
+        self.video_job.finished.connect(lambda *_:setattr(self.workflow,"last_count",None))
+        self.video_job.start(sys.executable,["-u","-m","anylabeling.services.workflow.video",str(self.video_payload)])
+        return {"status":"running"}
+
+    def video_status(self):
+        from anylabeling.services.workflow.project import read_json
+        if not self.video_payload:return {"status":"idle"}
+        result=read_json(self.video_payload.with_name("progress.json"))
+        if result.get("status")=="running" and self.video_job.state()==QtCore.QProcess.ProcessState.NotRunning:
+            result={"status":"failed","error":"视频任务进程意外退出，请检查格式后重试。"}
+        return result
+
+    def stop_video(self):
+        if self.video_payload and self.video_job and self.video_job.state()!=QtCore.QProcess.ProcessState.NotRunning:
+            self.video_payload.with_name("cancel").touch()
 
     def select_weights(self,value):
         if self.job and self.job.state()!=QtCore.QProcess.ProcessState.NotRunning:
@@ -281,6 +416,9 @@ class DesktopController(QtCore.QObject):
             raise ValueError("优化器无效。")
         options["optimizer"]=optimizer
         dataset=project.build_dataset(args)
+        snapshot=dataset if dataset.is_dir() else dataset.parent
+        frozen_images=json.loads((snapshot/"manifest.json").read_text(encoding="utf-8"))["images"]
+        dataset_counts={part:sum(image["split"]==part for image in frozen_images) for part in ("train","val","test")}
         self.training_settings={"split_mode":args.get("split_mode"),"split_ratio":args.get("split_ratio"),"split_count":args.get("split_count"),"split_seed":args.get("split_seed")}
         name="train_"+time.strftime("%Y%m%d_%H%M%S")
         run=project.root/"runs"/name
@@ -289,7 +427,7 @@ class DesktopController(QtCore.QObject):
             options.update(fliplr=0.,flipud=0.)
         payload=project.root/"runs"/(name+".json")
         write_json(payload,{"version":1,"action":"train","args":options,"paths":{"weights_directory":str(project.root/"models")},"options":{"auto_install_packages":False}})
-        self.training={"status":"starting","logs":[],"run":str(run),"project":str(project.root),"epochs":options["epochs"]}
+        self.training={"status":"starting","logs":[],"run":str(run),"project":str(project.root),"epochs":options["epochs"],"dataset_counts":dataset_counts,"dataset":str(snapshot),"started_at":time.time()}
         self.job=QtCore.QProcess(self)
         self.job.setProcessChannelMode(QtCore.QProcess.ProcessChannelMode.MergedChannels)
         self.job.setWorkingDirectory(str(project.root/"models"))
@@ -310,7 +448,7 @@ class DesktopController(QtCore.QObject):
         return {"run":str(run)}
 
     def job_error(self,message):
-        self.training.update(status="failed",error=message)
+        self.training.update(status="failed",error=message,finished_at=time.time())
         self.bridge.publish_state()
 
     def read_training(self):
@@ -324,6 +462,10 @@ class DesktopController(QtCore.QObject):
                 try:
                     event=json.loads(line[len(prefix):])
                 except ValueError:
+                    continue
+                if event["event"]=="training_progress":
+                    self.training["progress"]={key:value for key,value in event.items() if key not in ("event","version")}
+                    self.bridge.publish_state()
                     continue
                 if event["event"]=="training_started":self.training["status"]="training"
                 if event["event"]=="training_error":self.training.update(status="failed",error=event.get("error"))
@@ -342,6 +484,7 @@ class DesktopController(QtCore.QObject):
         self.read_training()
         if self.training["status"]!="stopped":
             self.training["status"]="completed" if code==0 else "failed"
+        self.training["finished_at"]=time.time()
         weights=Path(self.training["run"])/"weights"/"best.pt"
         if weights.exists() and self.training_template:
             write_json(weights.with_suffix(".workflow.json"),{"template_hash":template_hash(self.training_template),"classes":self.training_classes})
@@ -350,6 +493,7 @@ class DesktopController(QtCore.QObject):
     def stop_training(self):
         if self.job and self.job.state()!=QtCore.QProcess.ProcessState.NotRunning:
             self.training["status"]="stopped"
+            self.training["finished_at"]=time.time()
             if os.name=="nt":
                 import subprocess
                 subprocess.run(["taskkill","/PID",str(int(self.job.processId())),"/T","/F"],capture_output=True,creationflags=0x08000000)

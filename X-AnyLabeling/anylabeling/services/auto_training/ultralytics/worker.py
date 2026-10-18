@@ -47,6 +47,53 @@ def emit(event: str, **data) -> None:
     stream.flush()
 
 
+def attach_training_progress(model):
+    """Publish bounded-frequency progress and estimates including epoch validation."""
+    started = time.monotonic()
+    clock = {"epoch_start": started, "batch": 0, "last_emit": 0, "completed": 0}
+    durations = []
+
+    def publish(trainer, completed=None, phase="training", force=False):
+        now = time.monotonic()
+        if not force and now - clock["last_emit"] < 1:
+            return
+        clock["last_emit"] = now
+        total = max(1, int(trainer.epochs))
+        batches = max(1, len(trainer.train_loader))
+        epoch = min(total, max(0, int(trainer.epoch)))
+        done = float(completed) if completed is not None else epoch + .9 * min(1, clock["batch"] / batches)
+        average = sum(durations[-5:]) / len(durations[-5:]) if durations else None
+        emit("training_progress", epoch=min(total, epoch + 1), epochs=total,
+             batch=clock["batch"], batches=batches, completed=done, phase=phase,
+             elapsed_seconds=now-started,
+             eta_seconds=max(0, (total-done)*average) if average else None,
+             updated_at=time.time())
+
+    def epoch_start(trainer):
+        clock.update(epoch_start=time.monotonic(), batch=0, active_epoch=int(trainer.epoch))
+        publish(trainer, force=True)
+
+    def batch_end(trainer):
+        clock["batch"] += 1
+        publish(trainer, phase="validating" if clock["batch"] >= len(trainer.train_loader) else "training",
+                force=clock["batch"] >= len(trainer.train_loader))
+
+    def epoch_end(trainer):
+        if int(trainer.epoch) != clock.get("active_epoch"):
+            return
+        done = min(int(trainer.epoch)+1, int(trainer.epochs))
+        # Ultralytics also fires this hook during its final best-model evaluation.
+        if done <= clock["completed"]:
+            return
+        clock["completed"] = done
+        durations.append(time.monotonic()-clock["epoch_start"])
+        publish(trainer, completed=done, phase="epoch_completed", force=True)
+
+    model.add_callback("on_train_epoch_start", epoch_start)
+    model.add_callback("on_train_batch_end", batch_end)
+    model.add_callback("on_fit_epoch_end", epoch_end)
+
+
 class EventLogStream:
     def __init__(self, event: str):
         self._event = event
@@ -317,6 +364,7 @@ def run_train(payload: dict) -> None:
         sys.stdout = log_stream
         sys.stderr = log_stream
         model = YOLO(train_args.pop("model"))
+        attach_training_progress(model)
         train_args["verbose"] = False
         train_args["show"] = False
         model.train(**train_args)

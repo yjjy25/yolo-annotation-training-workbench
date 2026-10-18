@@ -45,9 +45,9 @@ module.exports=async function({win,app,backend,request,ready,root}){
     stage('create '+task);
     await evaluate("go('data')");await click('#new-project-main');await click(`[data-task=${task}]`);
     const project=path.join(qaRoot,task);
-    await fill('#new-name','合成界面验收 '+task);await fill('#new-classes','object');await fill('#new-source',path.join(root,'.runtime','smoke-v2',task,'images'));await fill('#new-root',project);
+    await fill('#new-name','合成界面验收 '+task);await fill('#new-classes','object');await fill('#new-root',project);
     if(task==='pose')await select('#new-preset','human');
-    await click('#create-project');await wait(()=>evaluate(`!!editor.image&&editor.project?.root===${JSON.stringify(project)}`));await pause(300);
+    await click('#create-project');await wait(()=>evaluate("!document.querySelector('#project-dialog').open"));await request('import_images',{path:path.join(root,'.runtime','smoke-v2',task,'images')});await evaluate("api.state().then(update).then(()=>loadImages()).then(()=>go('editor'))");await wait(()=>evaluate(`!!editor.image&&editor.project?.root===${JSON.stringify(project)}`));await pause(300);
     const suffix={detect:'',segment:'-seg',pose:'-pose',obb:'-obb',classify:'-cls'}[task];
     if(await evaluate("document.querySelector('#train-model').value")!=='yolov8n'+suffix+'.pt')throw new Error('Default model does not match task '+task);
     if(task==='segment'){for(const p of [[15,15],[70,15],[75,70],[20,75]])await canvasClick(p);win.webContents.sendInputEvent({type:'keyDown',keyCode:'Enter'});win.webContents.sendInputEvent({type:'keyUp',keyCode:'Enter'});}

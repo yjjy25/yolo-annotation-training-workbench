@@ -46,8 +46,8 @@
   },
   {
     "path": ".packaging/package_source.py",
-    "size": 2824,
-    "sha256": "b8ab9b9bcc6c57b3e463790b710cbfe97b271dd606b5a5b24c75cd8bf9fa2d57"
+    "size": 2947,
+    "sha256": "fe862f0c0df0226efc9c9ca3b5a4ef1540f212de505f280cc6431ee9aeaa45d0"
   },
   {
     "path": ".packaging/prepare-linux.sh",
@@ -95,14 +95,29 @@
     "sha256": "08214c502498f5f9f0bb7e71a5130b1364053f198ab58e543901193a33fb06a8"
   },
   {
+    "path": "CHANGELOG.md",
+    "size": 2649,
+    "sha256": "e3959905b0dd9785bfaed3e36faf9924e5686f960af6063534bfa70938b2957e"
+  },
+  {
+    "path": "desktop/data-import.js",
+    "size": 2411,
+    "sha256": "2e3518724e1e335e1eb89de305fd7b3c7268ca5b8579d0d37e6bf3a538e98d0e"
+  },
+  {
+    "path": "desktop/editor-async.test.cjs",
+    "size": 5116,
+    "sha256": "ed662c7c71ff73b27f15a3d4915fe83ca7be2c96aaabcc442a03adac8f213cbc"
+  },
+  {
     "path": "desktop/editor-edge.test.cjs",
     "size": 3810,
     "sha256": "03bc09a4323d5b05425bc50c4c0ed775bf58aec8d629347582328baabbf5bc32"
   },
   {
     "path": "desktop/editor.js",
-    "size": 55327,
-    "sha256": "9ffb492ef0c4783791facbe97421aaad92abc8c02042fd62f6ac02425e00c3a8"
+    "size": 69754,
+    "sha256": "f440dc60cb5d23d7c5e1492543183a69258d694d1d5dcd3fc0ae59477e834232"
   },
   {
     "path": "desktop/exit-qa.cjs",
@@ -130,9 +145,24 @@
     "sha256": "a81d597274b5865b8e15b8798fa9779082563358d1f487fc183df25baf7157d0"
   },
   {
+    "path": "desktop/image-assets.cjs",
+    "size": 3293,
+    "sha256": "4a56c7f5dcf3a54f9b8c77d652eae9233f28b81df558a7600605b4e68de7a49c"
+  },
+  {
+    "path": "desktop/image-assets.test.cjs",
+    "size": 2667,
+    "sha256": "9a0a332523dad134502b4295925489fe36c2536adf95cca122ba952fa1f67ee9"
+  },
+  {
+    "path": "desktop/image-refresh-qa.cjs",
+    "size": 4192,
+    "sha256": "2a39fbba391726b48e5b9c24fbed7aac1e7f86ab022aa6b54822975e2a940e7a"
+  },
+  {
     "path": "desktop/inline-qa.cjs",
-    "size": 11583,
-    "sha256": "dee6b726395038435933a1857b212d39ca5e9628fef2ea583e9f40a1177a1b42"
+    "size": 11863,
+    "sha256": "13130bfa1f40912e51a2f5a5697f051d20f5aa5555a2e8235fd60bb0460538de"
   },
   {
     "path": "desktop/inline-tools.js",
@@ -140,24 +170,34 @@
     "sha256": "a4d574f14c69a663686a6b78dbe83ff17c0825e22c8abbcf864c418c700177a0"
   },
   {
+    "path": "desktop/inspector-qa.cjs",
+    "size": 10577,
+    "sha256": "bc4a11d50e61241f4f6b16822cf18d1d14fe6b7654d07beafa9011423725bdfe"
+  },
+  {
     "path": "desktop/main.cjs",
-    "size": 24430,
-    "sha256": "63287a59bd2997e9d65f37699331f09a4d80ca5f64a34ec00e935ad4df6c399d"
+    "size": 30803,
+    "sha256": "a9f93eb8cf487550dad0aa94a88dbaad06aba9c5553ba0f9cde17e3d7642c789"
+  },
+  {
+    "path": "desktop/occlusion-qa.cjs",
+    "size": 4846,
+    "sha256": "197eb91a96eb7fb9c5ca51cdce873115bf888cddb3e6c92c661e726a147d98f5"
   },
   {
     "path": "desktop/package-lock.json",
     "size": 6055,
-    "sha256": "4a85d9653bb37d3e27bf698e7712e4daf1ac82c856e246a53d3b7709c2daf7a8"
+    "sha256": "eb58d4738feb0a3c28ee383c3c7548d7144f627e508bbc052e3d8f821b253abe"
   },
   {
     "path": "desktop/package-qa.cjs",
-    "size": 6367,
-    "sha256": "8f73d9ffcc17ee5fdb1b8bdae040219eb7ac07722a9ac97354c18a456557974f"
+    "size": 6377,
+    "sha256": "041e2269fa90d2002da1e791edead02f4c7443684ac93648107e31386071420c"
   },
   {
     "path": "desktop/package.json",
-    "size": 888,
-    "sha256": "19ac32b21b79d3c92ccfea742cde4be2e47379ef0704346cbaff7cac1abe9a50"
+    "size": 1855,
+    "sha256": "40c11f67c61240fe8a897a605ade797a334786703d14a4db1999af9660d204ed"
   },
   {
     "path": "desktop/pages-qa.cjs",
@@ -165,9 +205,24 @@
     "sha256": "59f7bed3db4096b77605cefc5cc628e6bf718a21e880f9f253b314b0f143df6b"
   },
   {
+    "path": "desktop/pose-photo-qa.cjs",
+    "size": 7232,
+    "sha256": "4b77d421bf5243e9c6299d93883e4f9010effa4dd2f4f012c28f3907557dbffc"
+  },
+  {
+    "path": "desktop/pose-reference-assets.test.cjs",
+    "size": 1524,
+    "sha256": "796ba3aa917ce2321f4a7651b86bea2a7fdf0e9d5c82ef55f6dc78941c4c2cd0"
+  },
+  {
+    "path": "desktop/pose-regression.test.cjs",
+    "size": 11556,
+    "sha256": "a9bfa7f667fc92e3b8dd4db1472eabf36003a84f05a9f6f786dd868fe6df6e15"
+  },
+  {
     "path": "desktop/preload.cjs",
-    "size": 1805,
-    "sha256": "90351769feab83e9210546ada0aa8eaa997ab55ecfb1547bd120f03d85d95f2d"
+    "size": 1975,
+    "sha256": "2b27ee61ced8d184c33f1ab988103895e066f2595bba53913e1888d7b8c1aac8"
   },
   {
     "path": "desktop/qa-extra.cjs",
@@ -176,8 +231,13 @@
   },
   {
     "path": "desktop/release-regression.test.cjs",
-    "size": 1123,
-    "sha256": "9d5a7d9191dcdd31cb5219f222bdf34a87ed7abf47df0522ca2fa3dda51a88f0"
+    "size": 3215,
+    "sha256": "41ebc55e526a9c8e796999d783cf924e708cf7bcfe366d66288b0415434bcc8f"
+  },
+  {
+    "path": "desktop/save-advance-qa.cjs",
+    "size": 9452,
+    "sha256": "8d7152ec5fc10a902eb641bef3298e32a424c2830cc31c71250051e8e4c475e6"
   },
   {
     "path": "desktop/shapes-qa.cjs",
@@ -185,29 +245,84 @@
     "sha256": "d796b297037a775e003f0afe7b274c5d7856cf4b2c2b5e5caf3095bfbfc1a127"
   },
   {
+    "path": "desktop/split-counts-qa.cjs",
+    "size": 4667,
+    "sha256": "cd153f9d473c24bd5066eb014e887bfc9156ef7597eaf0a4246e764a84ab5206"
+  },
+  {
+    "path": "desktop/split-counts.test.cjs",
+    "size": 2362,
+    "sha256": "26f8495fba8afdf7c5e61dcc6593f58cdfce84c5395be9746f2eea2f74ea0603"
+  },
+  {
     "path": "desktop/studio-qa.cjs",
-    "size": 8584,
-    "sha256": "094b5dfd365a02593b10141ca0418d467e63ef3707d0fa0273f910947aa84a68"
+    "size": 8847,
+    "sha256": "0f7a97fdf1c71a1ad2b9566c49c63525a21ed6afe3950160bed6ef5f3ff211b8"
   },
   {
     "path": "desktop/studio.css",
-    "size": 32869,
-    "sha256": "5a9c95af6deb1f91a1a7d06627f98607d50e1cb6e8d2f301c6af1093d1d5c469"
+    "size": 46377,
+    "sha256": "9f575ab591a39b92cdbeb40a998d5f39f18c770c4789ee53889854fa8c72cd73"
   },
   {
     "path": "desktop/studio.html",
-    "size": 24974,
-    "sha256": "7d16dd6fbc3b138d12efb40a7ab3e6c31bdc4d2e850e702b862fa44396da8a7a"
+    "size": 38562,
+    "sha256": "0d2def0860b0ca56c77be5ac99facf010c4e1e5fbfcb372b16b3f389e194a857"
   },
   {
     "path": "desktop/studio.js",
-    "size": 57218,
-    "sha256": "5e7ee238ff7a54d770f5cb992382454c75248d3310fd19596993016412641b8d"
+    "size": 66679,
+    "sha256": "d708a0e9c75999b8b189072cc8c53ab4184e1bbeccd1b828b6f5d091d6a5a3f5"
   },
   {
     "path": "desktop/traincheck-qa.cjs",
     "size": 4143,
     "sha256": "338721c373e8fed4d4c18597a07d184f95ecb2a0f2057d595939bbd8e14d68dd"
+  },
+  {
+    "path": "desktop/training-eta-qa.cjs",
+    "size": 3841,
+    "sha256": "bf18284192bfa5becf7dad882c2d134b42caa33212d2cc0668f16f578232b0e4"
+  },
+  {
+    "path": "desktop/training-progress.test.cjs",
+    "size": 1906,
+    "sha256": "188d582ac3e658f080b95b4fe6991532fa14cc45d237d815b7471d7ff3808a2f"
+  },
+  {
+    "path": "desktop/validation-video-qa.cjs",
+    "size": 3311,
+    "sha256": "461b98bd8f4c0ce20388974a44322910208b1ab8439eddfde781da3e78a97ddb"
+  },
+  {
+    "path": "desktop/video-pose-qa.cjs",
+    "size": 11214,
+    "sha256": "d7d97542b84bc1eeb8785668f5231f8a7ec009d436a53ec4d7a852aeac11548e"
+  },
+  {
+    "path": "desktop/video-review-qa.cjs",
+    "size": 19604,
+    "sha256": "ffd3f2159933dccbf04ba6576f2caaa89275670f0b3176a5f4639032c49328b1"
+  },
+  {
+    "path": "desktop/video-tracking-fixture.py",
+    "size": 798,
+    "sha256": "1dd0c415f01efa8497b2330e89a605825d9eed31a5592d6f3250aa693b785ee0"
+  },
+  {
+    "path": "desktop/video-tracking-qa.cjs",
+    "size": 282,
+    "sha256": "043176afeeec4e466f9e3a534ee4f080bfd7fa3ab5e59c76f1ac55e8a1d1d3db"
+  },
+  {
+    "path": "desktop/video-tracking.js",
+    "size": 30953,
+    "sha256": "341ea39eada43d853901b3d727bd39281ab78a9f6117da9562edf07117f72ef0"
+  },
+  {
+    "path": "desktop/workflow-tools.js",
+    "size": 17683,
+    "sha256": "ba087e3c61b7e770c33f433365bb4c9493394ad06d6ca03277acda7c7a21be62"
   },
   {
     "path": "LICENSE",
@@ -216,8 +331,8 @@
   },
   {
     "path": "README.md",
-    "size": 8969,
-    "sha256": "e0029133d871f9c3ce001ac250c8b1dd9f7c63639f46764617c595c35d3b5b35"
+    "size": 10740,
+    "sha256": "c29a24d42494146d7e540bc881c42b5dc2d53c7b21f3643ed7969a48f23214c0"
   },
   {
     "path": "setup-linux.sh",
@@ -2320,6 +2435,26 @@
     "sha256": "9a7ee61174e491e2306bb3f85e563c2fc99a57d0b8bb413a687901f733fd956a"
   },
   {
+    "path": "X-AnyLabeling/anylabeling/resources/pose_examples/dog24-examples.json",
+    "size": 25160,
+    "sha256": "797975b54871bd3041722ca914de3b13294e57712b9dfa722616b9730caa71fe"
+  },
+  {
+    "path": "X-AnyLabeling/anylabeling/resources/pose_examples/n02089078_3088.jpg",
+    "size": 44150,
+    "sha256": "0db2f6d8ac4c93d2f849758b16924ffaf1740a8769866f1e3a8e0143b98df3ee"
+  },
+  {
+    "path": "X-AnyLabeling/anylabeling/resources/pose_examples/n02108000_2172.jpg",
+    "size": 46804,
+    "sha256": "b2f5107e13bcafde50424229ea7d19cae0ff157143d859d1cdcd2e7865b14b71"
+  },
+  {
+    "path": "X-AnyLabeling/anylabeling/resources/pose_examples/README.md",
+    "size": 981,
+    "sha256": "a2a090973ab7981fbd7e12c7cf8e99aac376050d0e5f45c926d3d6deaf940eed"
+  },
+  {
     "path": "X-AnyLabeling/anylabeling/resources/resources.py",
     "size": 5267054,
     "sha256": "d88cae5921a08dbb99559dffcca69918b3bad2e11bbab5f8529908d6edd62055"
@@ -3801,8 +3936,8 @@
   },
   {
     "path": "X-AnyLabeling/anylabeling/services/auto_training/ultralytics/worker.py",
-    "size": 17649,
-    "sha256": "39b89c67581579f60cd7f02ae4f1fcdcd14f0759b460e972cbc851723c9d3589"
+    "size": 19864,
+    "sha256": "be48811d98bf9e047d5cb478a2ea315da17c9f9db26335bac992f8577feb0b8f"
   },
   {
     "path": "X-AnyLabeling/anylabeling/services/updates/__init__.py",
@@ -3826,8 +3961,13 @@
   },
   {
     "path": "X-AnyLabeling/anylabeling/services/workflow/desktop.py",
-    "size": 3629,
-    "sha256": "6eab51839f77fc32b8bcb8e8412e1a77d55aa429f52aae42b7bccc140c1a551c"
+    "size": 4499,
+    "sha256": "9be032db185cf5fe8d608aa6b5a566a2da0b3e627593c3b80f72cd5ef5b660c9"
+  },
+  {
+    "path": "X-AnyLabeling/anylabeling/services/workflow/import_data.py",
+    "size": 4589,
+    "sha256": "375d11c27975dddde0bbf5fdcf50efb207bc473f0eb9e60042f36bae3a2d7123"
   },
   {
     "path": "X-AnyLabeling/anylabeling/services/workflow/predict.py",
@@ -3841,18 +3981,33 @@
   },
   {
     "path": "X-AnyLabeling/anylabeling/services/workflow/project.py",
-    "size": 26304,
-    "sha256": "ebaad76f12cfb49a190e901d3be5ff68b42cbcbee68b2fc66830d440e4b96859"
+    "size": 26899,
+    "sha256": "51c5a048c8d19c53baac7a42dedd59fc8f32c19d0e04caa6b17774e0a757ca71"
+  },
+  {
+    "path": "X-AnyLabeling/anylabeling/services/workflow/tracking.py",
+    "size": 29947,
+    "sha256": "30cfb75e3e86af44c516caeae0d953f4bc1d193813fd01021cf179bd2a662bc0"
   },
   {
     "path": "X-AnyLabeling/anylabeling/services/workflow/validate.py",
-    "size": 15295,
-    "sha256": "497670f0b4b9a556bacb7e9a3ae44cfbd62f75090460ced9f9801510ce0b9708"
+    "size": 17586,
+    "sha256": "4b25c2096b5e64bb21864ad66831b19474f373ffaed0c7fd758b361a8a185720"
   },
   {
     "path": "X-AnyLabeling/anylabeling/services/workflow/validate_worker.py",
     "size": 1455,
     "sha256": "36cce3991ff1f95bf98f0c4457df1dd44dd6416022a86bbdc8e89de1340a5469"
+  },
+  {
+    "path": "X-AnyLabeling/anylabeling/services/workflow/video.py",
+    "size": 5593,
+    "sha256": "7c04a91629ac660ce0d4d282154c04bc5edc7e8f69d94c268d644f4c50614247"
+  },
+  {
+    "path": "X-AnyLabeling/anylabeling/services/workflow/video_workspace.py",
+    "size": 12386,
+    "sha256": "da408dd211b9240592f4f9bd63e92ac2ea1ca8a0969a97082c6e4e621c70468d"
   },
   {
     "path": "X-AnyLabeling/anylabeling/views/__init__.py",
@@ -4591,8 +4746,8 @@
   },
   {
     "path": "X-AnyLabeling/anylabeling/views/workflow/desktop_controller.py",
-    "size": 26599,
-    "sha256": "031718b8688c5beebdb6eae8bbd6cde5ecdbd2b4821b517fd8828cd394d38895"
+    "size": 35224,
+    "sha256": "dca5e6324a25b426292970760e3989d7c3fe6c5c4c592b6a935925b879e0fec6"
   },
   {
     "path": "X-AnyLabeling/anylabeling/views/workflow/electron_bridge.py",
@@ -6715,14 +6870,19 @@
     "sha256": "df1991fa593322cdabe658c2daf6d4508a0025aaf180f4b0fe33d57597ee5ab7"
   },
   {
+    "path": "X-AnyLabeling/tests/test_auto_training/test_progress.py",
+    "size": 1407,
+    "sha256": "4b176189a84c00439fc7b5a40ab6724792a99aedf2b9f05e69ae7c9130cf9fc3"
+  },
+  {
     "path": "X-AnyLabeling/tests/test_auto_training/test_trainer.py",
     "size": 4054,
     "sha256": "6ad282a4c4456629c30a5c9bf5b0fd98a4ef07e48f953412e0f3ba6de3c129da"
   },
   {
     "path": "X-AnyLabeling/tests/test_auto_training/test_worker.py",
-    "size": 11621,
-    "sha256": "df5386316ca254d2c8dee042bccde610b02d313227cb663eedddc70e76836cc6"
+    "size": 12124,
+    "sha256": "26d030aa3b9ca046e6e3c3185ddb6cffad017a58f196c9fc4f21eb6de94675a9"
   },
   {
     "path": "X-AnyLabeling/tests/test_canvas/test_brush_drawing.py",
@@ -7215,6 +7375,21 @@
     "sha256": "387c7186820f9be0e75018797c6adf04e0b0b1895368c176b94719827ee27afd"
   },
   {
+    "path": "X-AnyLabeling/tests/workflow/test_import_data.py",
+    "size": 4406,
+    "sha256": "eaf4fec41ebbf2aeca4e202193d27c62ce1bb088571ba5df60fc1a170c31c2c5"
+  },
+  {
+    "path": "X-AnyLabeling/tests/workflow/test_json_concurrency.py",
+    "size": 2912,
+    "sha256": "1e7b131136da42da87c9ab4334fa96fdb064419de7e3bc0ddc607d29050ffd56"
+  },
+  {
+    "path": "X-AnyLabeling/tests/workflow/test_occlusion.py",
+    "size": 1765,
+    "sha256": "73ede9f15c8b9efeafea92e32b9f63c7066af655988f7f92dcfc483668bf2a55"
+  },
+  {
     "path": "X-AnyLabeling/tests/workflow/test_project.py",
     "size": 10441,
     "sha256": "f8418d35e6bcf89efabd121f7b589abacaa18755c3a3b43b6d5339de0388c4c0"
@@ -7223,6 +7398,41 @@
     "path": "X-AnyLabeling/tests/workflow/test_release_regressions.py",
     "size": 4350,
     "sha256": "1977074a1bd78993d5a60712756831ef10d485ef7d7719639d2935a65d185dcb"
+  },
+  {
+    "path": "X-AnyLabeling/tests/workflow/test_tracking.py",
+    "size": 13310,
+    "sha256": "25bbe5a72c7a83ebeeea54f87e49bff8be1ab87452a7a975b708d00b9735444d"
+  },
+  {
+    "path": "X-AnyLabeling/tests/workflow/test_tracking_confirm_save.py",
+    "size": 1872,
+    "sha256": "1a6ac959c6e60f4c04e31f484e2b6e6b6c0113b4b6c934ec2ccd1f2925da4188"
+  },
+  {
+    "path": "X-AnyLabeling/tests/workflow/test_tracking_scale_edge.py",
+    "size": 3635,
+    "sha256": "6a5c129c0ddb0f4c4a8993683125133ee959b0a0677bcdec6b3a097e1045f40f"
+  },
+  {
+    "path": "X-AnyLabeling/tests/workflow/test_validation_video.py",
+    "size": 2171,
+    "sha256": "bf8d714e0a67b813955fd10e6ab7a88ace07e1e41fbc6209826339def04b80ff"
+  },
+  {
+    "path": "X-AnyLabeling/tests/workflow/test_video.py",
+    "size": 3452,
+    "sha256": "2bf2cd1f8f5b34430163921dd08c5da6080875aaa8f45908da335ec83f72a812"
+  },
+  {
+    "path": "X-AnyLabeling/tests/workflow/test_video_review_remove.py",
+    "size": 2400,
+    "sha256": "339b5e88339bb8cfad224c76d8b5832b271fb1c011c32aeec6bc4b07a67e0f1f"
+  },
+  {
+    "path": "X-AnyLabeling/tests/workflow/test_video_workspace.py",
+    "size": 6008,
+    "sha256": "0e2cbb7bfbe8fddf2519351b8adde7239ead1c2ba9358fb1b143aa8477928dfd"
   },
   {
     "path": "X-AnyLabeling/tools/label_drawer.py",
@@ -7340,6 +7550,11 @@
     "sha256": "9dd5550a4c973028f4f263783c5f94e076c03f4a12e017c82b3e478e82abcd58"
   },
   {
+    "path": "文档/0.5.0_发布检查.md",
+    "size": 3120,
+    "sha256": "7a12017e8a50ea6ac3e17281b243ae6d0078a3106275edb876068510c7685abc"
+  },
+  {
     "path": "文档/GUI美化与功能扩展_执行方案.md",
     "size": 16006,
     "sha256": "264612df233f9d8b1a502586f69797c2fafda57480c65d32a587ae5c4cceb6da"
@@ -7365,9 +7580,39 @@
     "sha256": "48c7aa6696c26554c729587f30f6631d254ff7546da9716b853b87d34a600a0e"
   },
   {
+    "path": "文档/保存切图性能修复_20261018.md",
+    "size": 3005,
+    "sha256": "1dc234bdb5ccc8b326ce753e8ac01b3fd944a9331922eca8b5cd393892336d0e"
+  },
+  {
+    "path": "文档/保存后自动下一张-20261018.md",
+    "size": 1243,
+    "sha256": "bea9dae6114d3989da35e6a0fab050fa6c3d44c259bb5387e66c9c4d7f2003b8"
+  },
+  {
+    "path": "文档/姿态标注规范.md",
+    "size": 10110,
+    "sha256": "b1c0785fc135b79a92c898b78bc5377db73f5e9cef8572948647bf798d74f70d"
+  },
+  {
     "path": "文档/安装后使用.md",
-    "size": 4718,
-    "sha256": "830631562a093b3d54c52f49330ca702684187336d30d76ec6dc43426e17ec23"
+    "size": 5402,
+    "sha256": "e58e88eba06690e51a8ba08f268069e93facd136844610b1c2bec34f221d231a"
+  },
+  {
+    "path": "文档/快速保存切图与视频微调总览-20261018.md",
+    "size": 2239,
+    "sha256": "ab71002609d2f696d6d4c93942b58c6a656b298a05a92f7fb67dd1beda5aac60"
+  },
+  {
+    "path": "文档/普通照片视频时间轴修复-20261018.md",
+    "size": 1249,
+    "sha256": "44b3c394f96dd07220319392125b07e6cf1922dac15834af1cdbe33f39b35e20"
+  },
+  {
+    "path": "文档/标注侧栏布局调整-20261018.md",
+    "size": 2972,
+    "sha256": "13c91898a05e4827ae55f788a589e01f78d5ae5f9fff1836b1fb380de794d2aa"
   },
   {
     "path": "文档/标注训练一体化软件_方案与执行目标.md",
@@ -7495,9 +7740,144 @@
     "sha256": "ec021fd3303a10e65eae60f6e1cba70df6b0761b6c26583cc2698b6c868fe1fb"
   },
   {
+    "path": "文档/界面预览/姿态标注规范-20261018.png",
+    "size": 605636,
+    "sha256": "c260e40bdd829f8f7ac88159ec59aa08d75715968f2ebb572f6f8a93b1154dbb"
+  },
+  {
+    "path": "文档/界面预览/姿态照片与点位示例-20261018.png",
+    "size": 824037,
+    "sha256": "834feedd74ea7266229251bafd22e16c0028b346294161f805699ca58d6dd1b3"
+  },
+  {
     "path": "文档/界面预览/工作台.png",
     "size": 112003,
     "sha256": "b60afaa5646402d80b2a8f212151df878234d2d2d46fad4b5407af9ecf5ba9cc"
+  },
+  {
+    "path": "文档/界面预览/数据集导入-20261018.png",
+    "size": 501161,
+    "sha256": "5bd86b28d7adedcb087c776d8c389afea5b50e2ec717fcc6a4053dc3d74a4f1f"
+  },
+  {
+    "path": "文档/界面预览/标注侧栏-小窗口-20261018.png",
+    "size": 1128092,
+    "sha256": "d007230ce6ff0a8d50c1e98e03a7cec51751ba6afc757ba75e97ebba58ef3611"
+  },
+  {
+    "path": "文档/界面预览/标注侧栏-浅色-20261018.png",
+    "size": 1553711,
+    "sha256": "29fabf10121a8861bd6e53fdc914acd4be13b7671b67fb89c43b2bde08957827"
+  },
+  {
+    "path": "文档/界面预览/标注侧栏-深色-20261018.png",
+    "size": 1925378,
+    "sha256": "283cb76a0cf6c12ee9fa5dc482e7edd81ae30c16763922b4fe229bec449bbba4"
+  },
+  {
+    "path": "文档/界面预览/照片实际骨点对应-20261018.png",
+    "size": 1260978,
+    "sha256": "f0754d91cb5be59159b34de31b9267cb141e797460e55762b6fb96ecd3c11c53"
+  },
+  {
+    "path": "文档/界面预览/空项目数据集-20261018.png",
+    "size": 357881,
+    "sha256": "f9e62a95dca22c8865ba57b274698cedcd3a57dfca6a5c4e9eda914777922b24"
+  },
+  {
+    "path": "文档/界面预览/视频待确认与进度编辑-20261018.png",
+    "size": 616848,
+    "sha256": "9506da2ca5432aeb5d728098d0abcc050cb61e2688bf95a5e4456cd0be0ab392"
+  },
+  {
+    "path": "文档/界面预览/视频确认后数据集-20261018.png",
+    "size": 345019,
+    "sha256": "3f70586de59f7c393056db159b61b606c137b4571e8a8aeeaadc998897f4cf45"
+  },
+  {
+    "path": "文档/界面预览/视频追踪标注-导入-20261018.png",
+    "size": 396558,
+    "sha256": "63ad8ab1ebd2c434b2b97079d78bd39f651acdadefd1c93a2628d8f69b860c76"
+  },
+  {
+    "path": "文档/界面预览/视频追踪标注-暂停-20261018.png",
+    "size": 596085,
+    "sha256": "9e5015eb7ec4d4079ced67147adcd53ba153882ffd6f04aa160607e0b9bdee14"
+  },
+  {
+    "path": "文档/界面预览/视频追踪标注-骨点-20261018.png",
+    "size": 742778,
+    "sha256": "ed215c137da898f5e3e3170dbb0025c8567d347d6479887ec92e64006284f169"
+  },
+  {
+    "path": "文档/界面预览/视频逐帧播放-20261018.png",
+    "size": 713254,
+    "sha256": "555e27968323c4359e1f36991a6e012daad452daf79f04c54fdd413d8bfbdbe2"
+  },
+  {
+    "path": "文档/界面预览/视频逐帧标注-20261018.png",
+    "size": 458928,
+    "sha256": "8528e78ea58de3fc5fcafbb5dcefc19cf9794853eb74201085d27745f1f57690"
+  },
+  {
+    "path": "文档/空项目导入与视频播放-20261018.md",
+    "size": 3816,
+    "sha256": "26f643ae0149f3e26f2dec74f2677f2c32f8193a7873546ebc9a2fe1a4404cb9"
+  },
+  {
+    "path": "文档/空项目导入与视频播放-桌面验收-20261018.json",
+    "size": 2544,
+    "sha256": "11ec616ffcd11f5f626b0af03f33ff7885029de7af7610dbeb54ec73c0cb95f1"
+  },
+  {
+    "path": "文档/视频姿态功能验收-20261018.md",
+    "size": 5509,
+    "sha256": "48bae641340b0944f7293baf2fc75b08299e6c972e78fa3db862caa2aafdd1f7"
+  },
+  {
+    "path": "文档/视频待确认与实时进度编辑-20261018.md",
+    "size": 3560,
+    "sha256": "dfa7f2f90436c4c10a24cb4919b72340be025070674a8aa0262c4535cd5efb53"
+  },
+  {
+    "path": "文档/视频待确认与实时进度编辑-桌面验收-20261018.json",
+    "size": 1298,
+    "sha256": "5554cf5f2b5a68ca56b6eaf95d7b87557e931740ea3891b115c9bc70dedf88a8"
+  },
+  {
+    "path": "文档/视频模型验证播放_20261018.md",
+    "size": 2302,
+    "sha256": "ec51e48f4f018170aed86c34e0793a27d89e9c05f4fb62eba2722a5c4a5989cc"
+  },
+  {
+    "path": "文档/视频追踪标注-20261018.md",
+    "size": 6521,
+    "sha256": "e807c6072e92b08a26b884f5b8a6886e8758fbfccb8197e6731e1ccea54936cc"
+  },
+  {
+    "path": "文档/视频追踪标注-桌面验收-20261018.json",
+    "size": 1180,
+    "sha256": "78983d00d4e00ae29dd89a3d4691ec007c01e8791a6b3ac12c48c5ae5aec4b07"
+  },
+  {
+    "path": "文档/视频追踪独立标注与画布复核-20261018.md",
+    "size": 1740,
+    "sha256": "38484245af00ca76bd4d38ab2bf1f550cc5b8b161d059e73902452559b411ecb"
+  },
+  {
+    "path": "文档/视频追踪缩放贴边与保存审核-20261018.md",
+    "size": 2556,
+    "sha256": "bcb5d5a779193dde6a1913c4c38b2a6506d8ed01ad3ff3da2c2f1d9483c3cf77"
+  },
+  {
+    "path": "文档/训练划分数量修复_20261018.md",
+    "size": 2022,
+    "sha256": "26abb89429b697d6894c54e81d762a6e4f00b5d161f6d9fc2a0e4c65ec4705e0"
+  },
+  {
+    "path": "文档/训练进度与完成时间_20261018.md",
+    "size": 1805,
+    "sha256": "eccfa437f45de787c1a913015a6fae77275c46fc55f9503d23599189e87ebc90"
   },
   {
     "path": "文档/项目体积分析_0.4.md",
@@ -7508,5 +7888,10 @@
     "path": "文档/验证记录.md",
     "size": 35547,
     "sha256": "1a8397c936a0498e18536f7fbce384007abf4e98458c2a33536283417934ee5a"
+  },
+  {
+    "path": "文档/骨点移开恢复任务-20261018.md",
+    "size": 1059,
+    "sha256": "b69a0f175095a712d90d7bef253bf37c61443a936ee600b453198be6ef6d9e30"
   }
 ]

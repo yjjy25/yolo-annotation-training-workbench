@@ -1,0 +1,25 @@
+const assert=require('node:assert/strict');
+const {imageDimensions,createImageAssets}=require('./image-assets.cjs');
+const png=Buffer.alloc(32);Buffer.from('89504e470d0a1a0a','hex').copy(png);png.writeUInt32BE(720,16);png.writeUInt32BE(1280,20);
+const jpg=Buffer.from([255,216,255,192,0,11,8,5,0,2,208,1,1,17,0,255,217]);
+const bitmap={isEmpty:()=>false,getSize:()=>({width:160,height:160}),resize(){return this;},toDataURL:()=> 'data:image/png;base64,thumbnail'};
+(async()=>{
+ assert.deepEqual(imageDimensions(png),{width:720,height:1280,mime:'image/png'});
+ assert.deepEqual(imageDimensions(jpg),{width:720,height:1280,mime:'image/jpeg'});
+ assert.equal(imageDimensions(Buffer.from('broken')),null);
+ let stamp=1,reads=0,decodes=0,fail=false;
+ const fs={promises:{stat:async()=>({mtimeMs:stamp,size:png.length}),readFile:async location=>{reads++;return location.endsWith('.jpg')?jpg:png;}}};
+ const nativeImage={createThumbnailFromPath:async()=>{decodes++;if(fail)throw Error('missing');return bitmap;},createFromPath(){if(fail)throw Error('missing');return bitmap;},createFromBuffer:()=>bitmap};
+ const assets=createImageAssets({fs,nativeImage});
+ const results=await Promise.all(Array.from({length:30},()=>assets.read('/a/photo.png')));
+ assert.equal(reads,1,'concurrent requests share one read');assert.ok(results.every(r=>r===results[0]));
+ assert.equal(results[0].url,'data:image/png;base64,'+png.toString('base64'),'retain original compressed PNG');
+ assert.equal((await assets.read('/a/photo.jpg')).url,'data:image/jpeg;base64,'+jpg.toString('base64'),'retain original compressed JPEG');
+ await Promise.all(Array.from({length:30},()=>assets.read('/a/photo.png',160)));assert.equal(decodes,1,'concurrent thumbnails share one asynchronous decode');
+ await assets.read('/b/photo.png');assert.equal(reads,3,'different project directories cannot share entries');
+ stamp++;await assets.read('/a/photo.png');assert.equal(reads,4,'modified images invalidate cache');
+ fail=true;await assert.rejects(assets.read('/a/retry.png',160));fail=false;await assets.read('/a/retry.png',160);assert.equal(decodes,3,'failed thumbnail requests can retry');
+ assets.clear();await assets.read('/a/photo.png');assert.equal(reads,5,'clear releases cached results');
+ const bounded=createImageAssets({fs,nativeImage,maxBytes:1});await bounded.read('/a/photo.png');await bounded.read('/a/photo.png');assert.equal(reads,7,'oversize entries do not remain cached');
+ console.log('Image assets: dimensions, compressed originals, concurrent reads, thumbnails, invalidation, project isolation, retry and cache limits passed.');
+})().catch(error=>{console.error(error);process.exitCode=1;});

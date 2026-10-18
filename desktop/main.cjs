@@ -20,7 +20,7 @@ let current={event:'state',project:null,training:'idle',predicting:false,embedde
 let nativeDiagnostics=null;
 const diagnosticWaiters=new Map();
 const requests=new Map();
-const rpcMethods=new Set(['create_project','open_project','load_annotation','save_annotation','add_class','mode','start_training','stop_training','predict','stop_predict','accept','start_validation','stop_validation','model_classes','split_preview','remove_image']);
+const rpcMethods=new Set(['create_project','open_project','load_annotation','save_annotation','add_class','mode','start_training','stop_training','predict','stop_predict','accept','start_validation','stop_validation','model_classes','split_preview','remove_image','import_video','video_status','stop_video','video_sequences','create_tracking','start_tracking','tracking_status','advance_tracking','import_images','tracking_preview','ack_tracking_preview','seek_tracking','accept_tracking_frame','queue_tracking_review','remove_tracking_drafts']);
 function request(method,args={}){
   if(!ready)return Promise.reject(new Error(current.error||'本地引擎正在启动，请稍候。'));
   const request_id=require('node:crypto').randomUUID();
@@ -149,26 +149,71 @@ ipcMain.handle('desktop:rpc',async(_event,method,args={})=>{
   try{return {ok:true,result:await request(method,args)};}catch(error){return {ok:false,error:error.message};}
 });
 ipcMain.handle('desktop:choose',async(_event,kind)=>{
-  if(!['source','root','project','weights','image','video'].includes(kind))return null;
-  const options=kind==='source'||kind==='root'?{properties:['openDirectory','createDirectory']}:{properties:['openFile'],filters:kind==='image'?[{name:'图片',extensions:['png','jpg','jpeg','bmp','webp','tif','tiff']}]:kind==='video'?[{name:'视频',extensions:['mp4','avi','mov','mkv','webm','m4v']}]:[{name:kind==='project'?'项目':'模型',extensions:[kind==='project'?'json':'pt']}]};
+  if(!['source','root','project','weights','image','images','video'].includes(kind))return null;
+  const options=kind==='source'||kind==='root'?{properties:['openDirectory','createDirectory']}:{properties:kind==='images'?['openFile','multiSelections']:['openFile'],filters:['image','images'].includes(kind)?[{name:'图片',extensions:['png','jpg','jpeg','bmp','webp','tif','tiff']}]:kind==='video'?[{name:'视频',extensions:['mp4','avi','mov','mkv','webm','m4v']}]:[{name:kind==='project'?'项目':'模型',extensions:[kind==='project'?'json':'pt']}]};
   const selection=await dialog.showOpenDialog(win,options);
-  return selection.canceled?null:selection.filePaths[0];
+  return selection.canceled?null:kind==='images'?selection.filePaths:selection.filePaths[0];
 });
 ipcMain.handle('desktop:defaults',()=>({projects:path.join(packaged?RUNTIME:ROOT,'我的项目')}));
 ipcMain.on('desktop:native-input',(_event,data)=>{if(data&&typeof data==='object')send({...data,action:'native_input'});});
 ipcMain.on('desktop:native-view',(_event,data)=>{if(data&&typeof data==='object')send({...data,action:'native_view'});});
-ipcMain.handle('desktop:asset',(_event,name)=>{
+function workspaceImage(name){const image=path.join(current.project.root,'images',name);return fs.existsSync(image)?image:path.join(current.project.root,'video-work','images',name);}
+const workspaceAssets=require('./image-assets.cjs').createImageAssets({fs,nativeImage});
+ipcMain.handle('desktop:asset',async(_event,name,width)=>{
   if(typeof name!=='string'||path.basename(name)!==name||!current.project)throw new Error('图片名称无效。');
-  const location=path.join(current.project.root,'images',name);
   if(!/\.(png|jpe?g|bmp|webp|tiff?)$/i.test(name))throw new Error('图片格式不支持。');
-  const bitmap=nativeImage.createFromPath(location);
-  if(bitmap.isEmpty())throw new Error('图片无法解码；可用原版工具打开此图片。');
-  return {url:bitmap.toDataURL(),...bitmap.getSize()};
+  return workspaceAssets.read(workspaceImage(name),width);
 });
 ipcMain.handle('desktop:models',()=>{
   if(!current.project)return [];
   const directory=path.join(current.project.root,'runs');
   try{return fs.readdirSync(directory,{withFileTypes:true}).filter(item=>item.isDirectory()).map(item=>({name:item.name,weights:path.join(directory,item.name,'weights','best.pt')})).filter(item=>fs.existsSync(item.weights)).reverse();}catch{return [];}
+});
+ipcMain.handle('desktop:pose-reference',(_event,options={})=>{
+  if(current.project?.task!=='pose')throw new Error('请先打开姿态项目。');
+  const directory=path.join(current.project.root,'references');
+  const record=path.join(directory,'pose-example.json');
+  if(options.name){
+    const name=options.name;
+    if(typeof name!=='string'||path.basename(name)!==name||!/\.(png|jpe?g|bmp|webp|tiff?)$/i.test(name))throw new Error('照片名称无效。');
+    const image=workspaceImage(name);
+    const label=path.join(path.dirname(path.dirname(image)),'annotations',path.parse(name).name+'.json');
+    const annotation=JSON.parse(fs.readFileSync(label,'utf8'));
+    if(!annotation.shapes?.some(s=>s.shape_type==='point'))throw new Error('请先在当前照片上标注骨点并保存。');
+    fs.mkdirSync(directory,{recursive:true});
+    if(fs.existsSync(record))fs.copyFileSync(record,path.join(directory,'pose-example-'+Date.now()+'.json'));
+    const photo='pose-photo-'+require('node:crypto').randomUUID()+path.extname(name);
+    fs.copyFileSync(image,path.join(directory,photo));
+    const payload={photo,annotation,source:name,template:current.project.template,note:'项目人工指定示例；请按本项目规范复核。'};
+    fs.writeFileSync(record+'.tmp',JSON.stringify(payload));fs.renameSync(record+'.tmp',record);
+  }
+  let photo,annotation=null,note,source;
+  if(fs.existsSync(record)&&!options.builtin){
+    const data=JSON.parse(fs.readFileSync(record,'utf8'));
+    if(path.basename(data.photo)!==data.photo)throw new Error('参考照片路径无效。');
+    photo=path.join(directory,data.photo);annotation=data.annotation;note=data.note;source=data.source;
+  }else if(current.project.template?.preset==='coco17'){
+    const base=path.join(ROOT,'X-AnyLabeling','examples','estimation','pose_estimation','sources');
+    photo=path.join(base,'human-pose.jpeg');annotation=JSON.parse(fs.readFileSync(path.join(base,'human-pose.json'),'utf8'));
+    note='X-AnyLabeling 人体姿态示例，沿用上游标注，仅作点位参考；缺失点按未知处理。';source='X-AnyLabeling/examples/estimation/pose_estimation/sources/human-pose.jpeg';
+  }else if(current.project.template?.preset==='dog24'){
+    const base=path.join(ROOT,'X-AnyLabeling','anylabeling','resources','pose_examples');
+    const catalog=JSON.parse(fs.readFileSync(path.join(base,'dog24-examples.json'),'utf8'));
+    if(JSON.stringify(catalog.template_points)!==JSON.stringify(current.project.template.points))throw new Error('照片示例骨点顺序与项目模板不匹配。');
+    const examples=catalog.examples.map(example=>{
+      if(path.basename(example.photo)!==example.photo)throw new Error('照片示例路径无效。');
+      const bitmap=nativeImage.createFromPath(path.join(base,example.photo));
+      if(bitmap.isEmpty())throw new Error('全身狗参考照片无法解码。');
+      return {...example,url:bitmap.toDataURL(),source:example.source+' · '+example.image_member};
+    });
+    if(!examples.length)throw new Error('尚无狗姿态照片示例。');
+    return {...examples[0],examples};
+  }else return {url:null,note:'自定义模板尚无参考照片。标好一张后，点“将当前照片设为示例”。'};
+  // Chromium decodes WebP even when nativeImage's platform decoder cannot.
+  if(path.extname(photo).toLowerCase()==='.webp')return {url:'data:image/webp;base64,'+fs.readFileSync(photo).toString('base64'),annotation,note,source};
+  const bitmap=nativeImage.createFromPath(photo);
+  if(bitmap.isEmpty())throw new Error('参考照片无法解码。');
+  return {url:bitmap.toDataURL(),annotation,note,source};
 });
 ipcMain.handle('desktop:results',()=>current.project?shell.openPath(path.join(current.project.root,'runs')):null);
 ipcMain.handle('desktop:validation-history',()=>{
@@ -184,6 +229,13 @@ ipcMain.handle('desktop:validation-history',()=>{
 });
 // Result plots live inside the project, never outside it: the requested path is
 // resolved first and then checked to still sit under runs/ or validation/.
+ipcMain.handle('desktop:result-video',(_event,relative)=>{
+  if(typeof relative!=='string'||!current.project||!relative.endsWith('.webm'))throw new Error('结果视频路径无效。');
+  const base=fs.realpathSync(path.join(current.project.root,'validation'));
+  const target=fs.realpathSync(path.resolve(current.project.root,relative));
+  if(!target.startsWith(base+path.sep)||!fs.statSync(target).isFile())throw new Error('结果视频必须位于当前项目的验证目录内。');
+  return {url:require('node:url').pathToFileURL(target).href};
+});
 ipcMain.handle('desktop:result-image',(_event,relative,maxWidth=1100)=>{
   if(typeof relative!=='string'||!current.project)throw new Error('结果图片路径无效。');
   if(!/\.(png|jpe?g|webp)$/i.test(relative))throw new Error('结果图片格式不支持。');
@@ -315,7 +367,20 @@ ipcMain.handle('desktop:close-ready',(_event,payload)=>{
   finishQuit(payload||{});return true;
 });
 
+let qaStarted=false;
 async function runQA(){
+  if(qaStarted)return;qaStarted=true;
+  if(process.env.XAL_QA_TRAININGETA)return require('./training-eta-qa.cjs')({win,app,backend:()=>backend,request,ready:()=>ready,root:ROOT});
+  if(process.env.XAL_QA_VALIDATIONVIDEO)return require('./validation-video-qa.cjs')({win,app,backend:()=>backend,request,ready:()=>ready,root:ROOT});
+  if(process.env.XAL_QA_SPLITCOUNTS)return require('./split-counts-qa.cjs')({win,app,backend:()=>backend,request,ready:()=>ready,root:ROOT});
+  if(process.env.XAL_QA_IMAGEPIPELINE)return require('./image-refresh-qa.cjs')({win,app,backend:()=>backend,request,ready:()=>ready,assetStats:workspaceAssets.stats});
+  if(process.env.XAL_QA_SAVEADVANCE)return require('./save-advance-qa.cjs')({win,app,backend:()=>backend,request,ready:()=>ready,root:ROOT});
+  if(process.env.XAL_QA_VIDEOREVIEW)return require('./video-review-qa.cjs')({win,app,backend:()=>backend,request,ready:()=>ready,root:ROOT});
+  if(process.env.XAL_QA_TRACKING)return require('./video-tracking-qa.cjs')({win,app,backend:()=>backend,request,ready:()=>ready,root:ROOT});
+  if(process.env.XAL_QA_INSPECTOR)return require('./inspector-qa.cjs')({win,app,backend:()=>backend,request,ready:()=>ready,root:ROOT});
+  if(process.env.XAL_QA_POSEPHOTO)return require('./pose-photo-qa.cjs')({win,app,backend:()=>backend,request,ready:()=>ready,root:ROOT});
+  if(process.env.XAL_QA_OCCLUSION)return require('./occlusion-qa.cjs')({win,app,backend:()=>backend,request,ready:()=>ready,root:ROOT});
+  if(process.env.XAL_QA_VIDEOPOSE)return require('./video-pose-qa.cjs')({win,app,backend:()=>backend,request,ready:()=>ready,root:ROOT});
   if(process.env.XAL_PACKAGE_TEST)return require('./package-qa.cjs')({win,app,backend:()=>backend,request,diagnostics,ready:()=>ready,testRoot:process.env.XAL_PACKAGE_TEST_ROOT});
   if(process.env.XAL_QA_EXITCASE)return require('./exit-qa.cjs')({win,app,backend:()=>backend,request,ready:()=>ready,root:ROOT});
   if(process.env.XAL_QA_INLINE)return require('./inline-qa.cjs')({win,app,backend:()=>backend,request,diagnostics,ready:()=>ready,root:ROOT});

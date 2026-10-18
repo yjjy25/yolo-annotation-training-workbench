@@ -7,6 +7,7 @@ import os
 import random
 import shutil
 import tempfile
+import time
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -18,7 +19,13 @@ IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff"}
 
 
 def read_json(path):
-    return json.loads(Path(path).read_text(encoding="utf-8"))
+    for attempt in range(9):
+        try:
+            return json.loads(Path(path).read_text(encoding="utf-8"))
+        except PermissionError:
+            if attempt == 8:
+                raise
+            time.sleep(min(.01 * 2 ** attempt, .16))
 
 
 def write_json(path, data):
@@ -30,7 +37,16 @@ def write_json(path, data):
             json.dump(data, stream, ensure_ascii=False, indent=2)
             stream.flush()
             os.fsync(stream.fileno())
-        os.replace(temporary, path)
+        # Windows readers/scanners may briefly hold a handle without delete sharing.
+        # Keep the original intact and retry the same completed temporary file.
+        for attempt in range(9):
+            try:
+                os.replace(temporary, path)
+                break
+            except PermissionError:
+                if attempt == 8:
+                    raise
+                time.sleep(min(.01 * 2 ** attempt, .16))
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)

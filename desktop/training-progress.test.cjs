@@ -1,0 +1,12 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync(require('node:path').join(__dirname,'studio.js'),'utf8');
+const nodes=new Map(),get=s=>{if(!nodes.has(s))nodes.set(s,{style:{},setAttribute(k,v){this[k]=v;},replaceChildren(){},append(){}});return nodes.get(s);};
+const context={state:{},Date,$:get,document:{createElement:()=>({append(){}})}};vm.createContext(context);
+vm.runInContext(source.slice(source.indexOf('let trainingHistory=null;'),source.indexOf('let plotRequest=')),context);
+const info={status:'training',epochs:10,run:'a/current',started_at:Date.now()/1000-50,progress:{epoch:2,epochs:10,batch:3,batches:10,completed:1.27,eta_seconds:100,updated_at:Date.now()/1000}};
+context.renderTrainingProgress(info);assert.equal(get('#training-progress-fill').style.width,'12.7%');assert.match(get('#training-eta').textContent,/预计完成/);assert.match(get('#training-elapsed').textContent,/已用时/);
+context.renderTrainingProgress({...info,progress:{...info.progress,eta_seconds:null}});assert.match(get('#training-eta').textContent,/首轮/);
+context.renderTrainingProgress({...info,status:'completed',progress:{...info.progress,completed:3}});assert.equal(get('#training-progress-fill').style.width,'100.0%');assert.match(get('#training-progress-text').textContent,/提前结束/);assert.equal(get('#training-eta').textContent,'');
+context.renderTrainingProgress({...info,status:'failed'});assert.equal(get('#training-progress-fill').style.width,'12.7%');assert.equal(get('#training-eta').textContent,'');
+vm.runInContext("trainingHistory={latest:{run:'old',rows:[['99']],columns:['epoch']}}",context);assert.equal(context.trainingProgress(info),null,'previous run cannot supply progress to the current run');
+console.log('Training progress: live batches, ETA, elapsed time, early finish, failure and run isolation passed.');
