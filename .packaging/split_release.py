@@ -6,8 +6,8 @@ import shutil
 
 ROOT=Path(__file__).resolve().parent.parent
 VERSION=json.loads((ROOT/'desktop/package.json').read_text(encoding='utf-8'))['version']
-OUT=ROOT/'发行包/GitHub-Releases'
-OUT.mkdir(exist_ok=True)
+OUT=ROOT/'发行包/GitHub-Releases'/VERSION
+OUT.mkdir(parents=True,exist_ok=True)
 records=[]
 for p in sorted((ROOT/'发行包').glob('AnnotationWorkbench-'+VERSION+'*')):
     if p.suffix not in {'.exe','.deb'}: continue

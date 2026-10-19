@@ -20,7 +20,7 @@ let current={event:'state',project:null,training:'idle',predicting:false,embedde
 let nativeDiagnostics=null;
 const diagnosticWaiters=new Map();
 const requests=new Map();
-const rpcMethods=new Set(['create_project','open_project','load_annotation','save_annotation','add_class','mode','start_training','stop_training','predict','stop_predict','accept','start_validation','stop_validation','model_classes','split_preview','remove_image','import_video','video_status','stop_video','video_sequences','create_tracking','start_tracking','tracking_status','advance_tracking','import_images','tracking_preview','ack_tracking_preview','seek_tracking','accept_tracking_frame','queue_tracking_review','remove_tracking_drafts']);
+const rpcMethods=new Set(['create_project','open_project','load_annotation','save_annotation','add_class','mode','start_training','stop_training','predict','stop_predict','accept','start_export','stop_export','start_validation','stop_validation','model_classes','model_info','split_preview','remove_image','import_video','video_status','stop_video','video_sequences','create_tracking','start_tracking','tracking_status','advance_tracking','import_images','tracking_preview','ack_tracking_preview','seek_tracking','accept_tracking_frame','queue_tracking_review','remove_tracking_drafts']);
 function request(method,args={}){
   if(!ready)return Promise.reject(new Error(current.error||'本地引擎正在启动，请稍候。'));
   const request_id=require('node:crypto').randomUUID();
@@ -50,7 +50,7 @@ function recoverDraft(draft){
 async function beginQuit(){
   if(quitPending||closing)return;
   quitPending=true;
-  if(['starting','training'].includes(current.training)||current.predicting||current.native_training||current.native_exporting){
+  if(['starting','training'].includes(current.training)||current.predicting||current.native_training||current.native_exporting||['starting','running'].includes(current.export_info?.status)){
     const answer=await dialog.showMessageBox(win,{type:'question',message:'任务仍在运行，停止任务并退出？',detail:'已有标注、训练检查点和结果会保留。',buttons:['继续工作','停止任务并退出'],defaultId:0,cancelId:0});
     if(answer.response!==1){quitPending=false;return;}
   }
@@ -215,7 +215,7 @@ ipcMain.handle('desktop:pose-reference',(_event,options={})=>{
   if(bitmap.isEmpty())throw new Error('参考照片无法解码。');
   return {url:bitmap.toDataURL(),annotation,note,source};
 });
-ipcMain.handle('desktop:results',()=>current.project?shell.openPath(path.join(current.project.root,'runs')):null);
+ipcMain.handle('desktop:results',(_event,kind)=>current.project?shell.openPath(path.join(current.project.root,kind==='exports'?'exports':'runs')):null);
 ipcMain.handle('desktop:validation-history',()=>{
   if(!current.project)return [];
   const directory=path.join(current.project.root,'validation');
@@ -370,6 +370,7 @@ ipcMain.handle('desktop:close-ready',(_event,payload)=>{
 let qaStarted=false;
 async function runQA(){
   if(qaStarted)return;qaStarted=true;
+  if(process.env.XAL_QA_MODELEXPORT)return require('./model-export-qa.cjs')({win,app,backend:()=>backend,request,ready:()=>ready,root:ROOT});
   if(process.env.XAL_QA_TRAININGETA)return require('./training-eta-qa.cjs')({win,app,backend:()=>backend,request,ready:()=>ready,root:ROOT});
   if(process.env.XAL_QA_VALIDATIONVIDEO)return require('./validation-video-qa.cjs')({win,app,backend:()=>backend,request,ready:()=>ready,root:ROOT});
   if(process.env.XAL_QA_SPLITCOUNTS)return require('./split-counts-qa.cjs')({win,app,backend:()=>backend,request,ready:()=>ready,root:ROOT});

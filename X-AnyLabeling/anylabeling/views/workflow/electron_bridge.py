@@ -124,7 +124,7 @@ class ElectronBridge(QtCore.QObject):
         # Only report validation belonging to the open project.
         if validation.get("project") and (not project or validation["project"]!=str(project.root)):
             validation={"status":"idle","logs":[],"run":None,"metrics":None}
-        self.emit("state", project=data, training=self.desktop.training["status"], native_training=native_training, native_exporting=native_exporting, training_info=self.desktop.training, validation_info=validation, predicting=bool(workflow.process and workflow.process.state()!=QtCore.QProcess.ProcessState.NotRunning), prediction_status=workflow.prediction_status, prediction_log=workflow.log.toPlainText()[-12000:], embedded=self.embedded, visible=self.visible, native_visible=self.window.isVisible(), active_class=getattr(workflow,"active_class",None), candidate=workflow.candidate.text())
+        self.emit("state", project=data, training=self.desktop.training["status"], native_training=native_training, native_exporting=native_exporting, training_info=self.desktop.training, validation_info=validation, export_info=self.desktop.export_job.info, predicting=bool(workflow.process and workflow.process.state()!=QtCore.QProcess.ProcessState.NotRunning), prediction_status=workflow.prediction_status, prediction_log=workflow.log.toPlainText()[-12000:], embedded=self.embedded, visible=self.visible, native_visible=self.window.isVisible(), active_class=getattr(workflow,"active_class",None), candidate=workflow.candidate.text())
 
     @QtCore.pyqtSlot(dict)
     def command(self, data):

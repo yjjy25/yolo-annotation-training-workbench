@@ -8,6 +8,7 @@ const iconPaths={
  models:'<rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="m12 8.2 1 2.6 2.6 1-2.6 1-1 2.6-1-2.6-2.6-1 2.6-1z"/>',
  review:'<rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="m7 12.4 3.4 3.4L17 8.6"/>',
  train:'<path d="M3.5 19.5h17"/><path d="M6.5 16.5v-4M11 16.5v-8M15.5 16.5v-5.5M20 16.5V6"/>',
+ export:'<path d="M4 7h15l-3-3M20 17H5l3 3M20 7v4M4 17v-4"/>',
  validate:'<rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M7.5 14.5l3-3.5 2.5 2.5 3.5-4.5"/>',
  advanced:'<rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M9.5 3.5v17M9.5 10h11M9.5 15h11"/>',
  plus:'<path d="M12 4.5v15M4.5 12h15"/>',
@@ -68,13 +69,14 @@ async function showPage(next){
   await window.videoTracking?.mount(next);
   document.querySelectorAll('main>section').forEach(section=>section.hidden=section.id!=='page-'+page);
   document.querySelectorAll('.nav-item[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===(review?'review':page)));
-  $('#crumb-page').textContent=review?'人工审查 · 待确认图片':{data:'数据与标注',video:'视频追踪标注','video-review':'视频待微调',editor:'标注画布',models:'模型预标注',train:'模型训练',validate:'模型验证'}[page];
+  $('#crumb-page').textContent=review?'人工审查 · 待确认图片':{data:'数据与标注',video:'视频追踪标注','video-review':'视频待微调',editor:'标注画布',models:'模型预标注',train:'模型训练',validate:'模型验证',export:'模型转换与量化'}[page];
   if(page==='video'||page==='video-review')await window.videoTracking?.refresh();
   // The image list drives the canvas. On a fresh start it is still empty, so an
   // entry into the canvas used to leave a blank picture with an empty label list.
   if(page==='editor'&&!items.length&&state.project)await loadImages();
   if(page==='editor'){editor.fit();if(!editor.name&&items[0]){await editor.open(items[0].name);renderFilmstrip();}}
-  if(page==='train'||page==='models')await refreshModels();
+  if(page==='train'||page==='models'||page==='export')await refreshModels();
+  if(page==='export')refreshExportSource();
   if(page==='train')refreshTrainingResults();
   if(page==='data')await loadImages();
   if(page==='data'||page==='train')refreshSplitPreview();
@@ -263,6 +265,7 @@ function update(next){
  }
  $('#train-start').disabled=trainingPending||running||!next.ready||!project||c.checked<2;$('#train-start').title=c.checked<2?'请先标注并审核至少两张内容不同的图片。':'';$('#train-stop').disabled=!running;
  renderValidation(next.validation_info,project);
+ renderExport(next);
  $('#predict-start').disabled=!!next.predicting||!!next.native_training||running||!next.ready||!project;$('#predict-stop').disabled=!next.predicting;$('#predict-status').textContent=next.predicting?'正在生成全部图片候选…':({idle:'尚未生成候选',completed:'候选已生成，请进入人工审查',failed:'预标注失败，请查看日志中的原因',stopped:'已停止，已生成的候选仍保留'}[next.prediction_status]||'尚未生成候选');$('#predict-log').textContent=next.prediction_log||'';
  const pk=JSON.stringify([project?.root,project?.classes,project?.template]);if(pk!==projectKey){projectKey=pk;editor.setProject(project);modelKey='';refreshModels();}
  const key=JSON.stringify([project?.root,c.total,c.checked,c.draft,next.predicting,Math.round((window.devicePixelRatio||1)*10)]);if(key!==galleryKey){galleryKey=key;loadImages();}
@@ -489,8 +492,14 @@ async function refreshModels(){
   for(const record of records)addOption(validate,record.weights,record.name+' · 本项目模型');
   if(kept&&[...validate.options].some(o=>o.value===kept))validate.value=kept;else validate.value=records[0].weights;
  }
+ const exportSelect=$('#export-model'),exportKept=sameContext?exportSelect.value:'',exportOption=[...exportSelect.options].find(o=>o.value===exportKept);
+ exportSelect.replaceChildren();
+ for(const record of records)addOption(exportSelect,record.weights,record.name+' · 本项目模型');
+ if(exportOption&&exportKept&&![...exportSelect.options].some(o=>o.value===exportKept))exportSelect.add(exportOption);
+ if(exportKept&&[...exportSelect.options].some(o=>o.value===exportKept))exportSelect.value=exportKept;
+ if(!exportSelect.options.length)addOption(exportSelect,'','请选择本地 PT 权重或先训练模型');
  const list=$('#trained-models');list.replaceChildren();if(!records.length){const p=document.createElement('p');p.className='muted';p.textContent='训练完成后，best.pt 会出现在这里。';list.append(p);}
- for(const record of records){const row=document.createElement('div');row.className='model-row';const name=document.createElement('span');name.textContent=record.name;name.title=record.weights;const use=document.createElement('button');use.textContent='用于预标注';use.onclick=async()=>{$('#predict-model').value=record.weights;await rpc('mode',{mode:'trained'});go('models');};row.append(name,use);list.append(row);}
+ for(const record of records){const row=document.createElement('div');row.className='model-row';const name=document.createElement('span');name.textContent=record.name;name.title=record.weights;const use=document.createElement('button');use.textContent='用于预标注';use.onclick=async()=>{$('#predict-model').value=record.weights;await rpc('mode',{mode:'trained'});go('models');};const convert=document.createElement('button');convert.textContent='转换 / 量化';convert.onclick=async()=>{await go('export');$('#export-model').value=record.weights;refreshExportSource();};row.append(name,use,convert);list.append(row);}
 }
 async function localWeights(select){const path=await api.choose('weights');if(path){addOption($(select),path,path.split(/[\\/]/).pop()+' · 本地权重');$(select).value=path;}}
 function chooseTask(task){newTask=task;newShape=(taskShapes[task]||taskShapes.detect)[0].id;document.querySelectorAll('[data-task]').forEach(b=>b.classList.toggle('selected',b.dataset.task===task));$('#new-task-hint').textContent=taskHints[task];$('#new-pose-fields').hidden=task!=='pose';if(task==='pose'&&['目标','person','dog'].includes($('#new-classes').value))$('#new-classes').value=$('#new-preset').value==='dog'?'dog':'person';renderShapes();}
@@ -649,6 +658,29 @@ $('#retry').onclick=()=>api.retry();$('#logs').onclick=()=>api.logs();
 
 /* ---------- plain-language help for the confusing parameters ---------- */
 const HELP={
+ exportFormat:{title:'模型格式怎么选',body:()=>[
+  ['当前模型与转换目标',$('#export-source-info').textContent+'\n'+$('#export-target-info').textContent],
+  ['格式是什么','格式决定模型交给什么软件读取。训练得到的 .pt 是原模型文件；转换格式类似把文档另存成另一种文件类型，不会重新训练模型，也不会自动提高识别能力。'],
+  ['ONNX（推荐）','导出 .onnx 文件，多种推理软件支持。第一次使用可先选 ONNX + FP32，确认目标软件支持后，再考虑压缩。'],
+  ['TorchScript','导出 .torchscript 文件，主要交给使用 PyTorch 的程序。对接程序明确要求时再选，本页只支持 FP32。'],
+  ['原模型会怎样','原始 PT 权重保留。新模型和转换记录另存到项目 exports 目录。']
+ ]},
+ exportPrecision:{title:'计算精度是什么',body:()=>[
+  ['当前模型与转换目标',$('#export-source-info').textContent+'\n'+$('#export-target-info').textContent],
+  ['精度不等于准确率','这里的精度是存储和计算模型数字的方式，不是识别准确率，也不是转换进度。压缩可减小体积，识别效果可能变化，运行速度取决于设备。'],
+  ['FP32 · 标准精度','32 位浮点数。适合先跑通转换与使用流程，无需校准图片。原权重若已是 FP16，转为 FP32 也不能找回之前舍去的数值细节。'],
+  ['FP16 · 半精度','16 位浮点数。模型通常更小，适合支持半精度的显卡和推理软件，普通 CPU 不一定兼容；无需校准图片。'],
+  ['INT8 · 量化压缩','把部分计算压缩成 8 位整数。需要真实图片帮助软件确定数字范围，通常更省空间；完成后需要检查识别效果。选 INT8 后，点击校准图片旁的 ! 查看步骤。'],
+  ['当前类型如何判断','页面读取当前 PT 文件中实际浮点权重和缓冲区的数据类型。混合类型会一起列出；读不到会显示未知，不会根据 .pt 后缀猜成 FP32。这里显示的是文件存储类型，运行时可能使用其他精度。']
+ ]},
+ exportCalibration:{title:'转成 INT8，图片怎么校准',body:()=>[
+  ['校准是什么','校准的是模型的数字范围，不是给图片改颜色、画框或重新训练。软件让原模型看一批真实图片，统计中间计算结果的范围，再用这些范围生成 INT8 模型。'],
+  ['第一步 · 准备图片','单独准备一个文件夹，放至少约 100 张有代表性的真实训练图片，覆盖部署时的类别、光照、背景、距离和目标大小。可以有子文件夹；不用画框、标骨点或准备标签文件。不要拿最终测试集来校准。'],
+  ['第二步 · 选择目录','目标格式选 ONNX，计算精度选 INT8。点击“校准图片文件夹”旁的“选择”，选刚才的目录；“最多校准图片数”默认 100，会按路径排序取前 100 张，因此请提前把图片选得有代表性。'],
+  ['第三步 · 点击开始转换','软件会自动读取图片并进行匹配模型的缩放、补边或裁剪。无需你手工改图或写命令。日志中出现“校准：图片路径”表示正在使用该图片，完成后生成 model-int8.onnx。'],
+  ['第四步 · 检查效果','拿未用于校准的真实验证图片，对比原模型和 INT8 模型的漏检、误检及速度。当前模型验证页面只接收 PT，INT8 ONNX 需要在支持 ONNX 的目标推理软件中检查。转换成功仅表示文件生成并通过基本检查。'],
+  ['图片少或效果下降怎么办','少量图片可以测试流程，但不能证明量化准确率。效果下降时，先补充缺失的光照、类别和场景，调整代表性图片后重新转换；也可以改用 FP32，或设备支持时尝试 FP16。']
+ ]},
  split:{title:'训练 / 验证划分',body:[
   ['为什么要划分','模型只有在没见过的图片上才知道自己行不行。所以已审核的图片会被分成两部分：大部分用来“学”（训练集），留一小部分不参与学习，只用来打分（验证集）。'],
   ['划分方式','按比例：验证集占已审核图片的百分比，例如 20%。按数量：直接指定验证集有几张，例如 1 张。数据很少时用“按数量”更好控制。'],
@@ -713,7 +745,7 @@ function openHelp(key){
  if(!entry)return;
  $('#help-title').textContent=entry.title;
  const body=$('#help-body');body.replaceChildren();
- for(const [heading,text] of entry.body){
+ for(const [heading,text] of (typeof entry.body==='function'?entry.body():entry.body)){
   const card=document.createElement('div');card.className='help-card';
   const title=document.createElement('strong');title.textContent=heading;
   const paragraph=document.createElement('p');paragraph.textContent=text;
@@ -725,6 +757,57 @@ document.querySelectorAll('[data-help]').forEach(button=>{
  button.onclick=event=>{event.preventDefault();event.stopPropagation();openHelp(button.dataset.help);};
 });
 $('#help-close').onclick=()=>$('#help-dialog').close();
+
+let exportPending=false,exportSourceGeneration=0,exportSourceKey='';
+async function refreshExportSource(){
+ const weights=$('#export-model').value,root=state.project?.root,key=JSON.stringify([root,weights]);
+ if(key===exportSourceKey)return;
+ exportSourceKey=key;const generation=++exportSourceGeneration;
+ const label=$('#export-source-info');
+ if(!weights){label.textContent='当前模型：尚未选择 PT 权重。';return;}
+ label.textContent='当前模型：正在读取 PT 权重的实际存储精度…';
+ try{
+  const info=await rpc('model_info',{weights});
+  if(generation!==exportSourceGeneration||weights!==$('#export-model').value||root!==state.project?.root)return;
+  label.textContent='当前模型：'+info.format+'（.pt） · '+info.precision+(info.mixed?'（混合存储）':'')+'；这是文件存储精度。';
+ }catch(error){if(generation===exportSourceGeneration){exportSourceKey='';label.textContent='当前模型：PT（.pt） · 精度未知；'+error.message;}}
+}
+function renderExport(next){
+ const info=next.project&&next.export_info?.project===next.project.root?next.export_info:{status:'idle',logs:[]};
+ const busy=['starting','running'].includes(info.status);
+ $('#export-status').textContent={idle:'尚未运行',starting:'正在准备转换',running:'正在转换 / 量化',completed:'转换完成',failed:'转换失败，请查看日志',stopped:'已停止，未完成文件请勿部署'}[info.status]||info.status;
+ $('#export-output').textContent=info.output||'';
+ const logs=$('#export-log'),text=(info.logs||[]).join('\n');
+ if(logs.textContent!==text){logs.textContent=text;logs.scrollTop=logs.scrollHeight;}
+ $('#export-start').disabled=exportPending||busy||!next.ready||!next.project;
+ $('#export-stop').disabled=!busy;
+ $('#export-folder').disabled=!next.project;
+}
+function exportSettings(){
+ const torch=$('#export-format').value==='torchscript',precision=$('#export-precision');
+ for(const option of precision.options)option.disabled=torch&&option.value!=='fp32';
+ if(torch)precision.value='fp32';
+ const int8=precision.value==='int8';
+ $('#export-calibration-fields').hidden=!int8;
+ $('#export-calibration').required=int8;$('#export-calibration-limit').disabled=!int8;
+ $('#export-target-info').textContent='转换目标：'+(torch?'TorchScript（.torchscript）':'ONNX（.onnx）')+' · '+precision.value.toUpperCase()+(int8?' · 需要校准图片':' · 无需校准图片');
+ $('#export-hint').textContent='格式和精度要按最终运行模型的软件、设备来选。文件转换完成后，请用真实图片检查识别效果，再比较速度；模型变小不代表一定更快。';
+}
+$('#export-format').onchange=exportSettings;$('#export-precision').onchange=exportSettings;exportSettings();
+$('#export-model').onchange=()=>refreshExportSource();
+$('#export-local').onclick=async()=>{await localWeights('#export-model');refreshExportSource();};
+$('#export-choose-calibration').onclick=async()=>{const path=await api.choose('source');if(path)$('#export-calibration').value=path;};
+$('#export-folder').onclick=()=>api.results('exports');
+$('#export-stop').onclick=async()=>{try{await rpc('stop_export');}catch(error){toast(error.message);}};
+$('#export-form').onsubmit=async event=>{
+ event.preventDefault();if(exportPending)return;exportPending=true;renderExport(state);
+ try{
+  await editor.save();
+  await rpc('start_export',{weights:$('#export-model').value,format:$('#export-format').value,precision:$('#export-precision').value,imgsz:Number($('#export-imgsz').value),calibration:$('#export-calibration').value.trim(),calibration_limit:Number($('#export-calibration-limit').value)});
+  toast('转换已启动，输出保存在项目 exports 目录。');
+ }catch(error){toast(error.message);}finally{exportPending=false;api.state().then(update);}
+};
+
 api.onState(update);api.state().then(update);
 if(api.onBeforeClose)api.onBeforeClose(async()=>({draft:(editor.dirty||editor.pending.length)&&editor.data?{project:editor.project?.root,name:editor.name,annotation:structuredClone(editor.data),base_hash:editor.baseHash,pending:structuredClone(editor.pending)}:null}));
 // Keep the desktop title bar operable while a project/category form is open.

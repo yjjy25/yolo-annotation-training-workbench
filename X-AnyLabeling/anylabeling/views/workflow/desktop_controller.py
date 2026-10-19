@@ -21,6 +21,8 @@ class DesktopController(QtCore.QObject):
         self.validation={"status":"idle","logs":[],"run":None,"metrics":None}
         self.validation_job=None
         self.validation_buffer=""
+        from .export_job import ExportJob
+        self.export_job=ExportJob(self)
         self.video_job=None
         self.video_payload=None
         self.video_kind="import"
@@ -36,6 +38,7 @@ class DesktopController(QtCore.QObject):
 
     def call(self,method,args):
         if method=="prepare_exit":
+            self.export_job.stop()
             self.stop_video()
             if self.video_job and not self.video_job.waitForFinished(2000):
                 self.video_job.kill()
@@ -173,6 +176,8 @@ class DesktopController(QtCore.QObject):
             self.stop_training()
             return True
         if method=="predict":
+            if self.export_job.active():
+                raise ValueError("模型转换正在运行，请先完成或停止。")
             self.select_weights(args["weights"])
             self.workflow.device.setCurrentText(str(args.get("device","cpu")))
             self.workflow.confidence.setValue(float(args.get("confidence",.25)))
@@ -227,11 +232,19 @@ class DesktopController(QtCore.QObject):
             return self.bridge.inline.dismiss()
         if method=="start_validation":
             return self.start_validation(args)
+        if method=="start_export":
+            return self.export_job.start(args)
+        if method=="stop_export":
+            self.export_job.stop()
+            return True
         if method=="stop_validation":
             self.stop_validation()
             return True
         if method=="model_classes":
             return self.model_classes(args.get("weights",""))
+        if method=="model_info":
+            from anylabeling.services.workflow.model_export import inspect_weights
+            return inspect_weights(args.get("weights", ""))
         if method=="split_preview":
             return self.project().split_preview(args)
         raise ValueError("不支持的操作。")
@@ -266,6 +279,8 @@ class DesktopController(QtCore.QObject):
         return [str(name) for name in names]
 
     def ensure_switchable(self):
+        if self.export_job.active():
+            raise ValueError("模型转换正在运行，请先完成或停止。")
         self.ensure_video_idle()
         if self.workflow.view.dirty:
             raise ValueError("高级标注有未保存的修改，请先保存后再操作。")
@@ -502,6 +517,8 @@ class DesktopController(QtCore.QObject):
 
     def start_validation(self,args):
         """Evaluate a trained weight on the frozen validation split."""
+        if self.export_job.active():
+            raise ValueError("模型转换正在运行，请先完成或停止。")
         if self.job and self.job.state()!=QtCore.QProcess.ProcessState.NotRunning:
             raise ValueError("训练正在运行，请先完成或停止训练再验证。")
         if self.validation_job and self.validation_job.state()!=QtCore.QProcess.ProcessState.NotRunning:

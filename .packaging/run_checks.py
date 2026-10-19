@@ -7,7 +7,8 @@ import subprocess
 import sys
 
 ROOT=Path(__file__).resolve().parent.parent
-OUT=ROOT/'.packaging/checks-041'
+VERSION=json.loads((ROOT/'desktop/package.json').read_text(encoding='utf-8'))['version']
+OUT=ROOT/'.packaging'/('checks-'+VERSION)
 OUT.mkdir(exist_ok=True)
 results=[]
 tests=sorted((ROOT/'X-AnyLabeling/tests/workflow').glob('test_*.py'))

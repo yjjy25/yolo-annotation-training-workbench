@@ -56,13 +56,13 @@
   },
   {
     "path": ".packaging/run_checks.py",
-    "size": 1452,
-    "sha256": "7c21ea6c97ea1d309e617597c8867fe750ea5774c4f2a28fcabe3437726feb35"
+    "size": 1550,
+    "sha256": "673c1a566ca9cddfabf3f6efbc8342866d4b2bbd39249b73ad9990aa78e63ac3"
   },
   {
     "path": ".packaging/split_release.py",
-    "size": 3259,
-    "sha256": "b191e2def1aee2cd3ac8cf9726c0ff72b1e94a56fdf037e538bbf3f6c87d7e9f"
+    "size": 3280,
+    "sha256": "bb6a67cc0a0078f71243399654ba98d6df3c17a5de1c1d24984fdb55e1c717d0"
   },
   {
     "path": ".packaging/verify_release.py",
@@ -71,8 +71,8 @@
   },
   {
     "path": ".packaging/构建说明.md",
-    "size": 5303,
-    "sha256": "1b98ca661bd0ecfa43f9bbe1a0fc265ef64c9ea85dccda76d3ae599709441e2b"
+    "size": 5572,
+    "sha256": "8dbeaccd9c6bf9ec06ee3ca68723dff5b2adb388a57f6859d17e8cd13277b1c8"
   },
   {
     "path": ".runtime/fonts/NotoSansSC.ttf",
@@ -96,8 +96,8 @@
   },
   {
     "path": "CHANGELOG.md",
-    "size": 2649,
-    "sha256": "e3959905b0dd9785bfaed3e36faf9924e5686f960af6063534bfa70938b2957e"
+    "size": 3409,
+    "sha256": "fe650df3d1d8e9d2711cf748f10867fdfb7a839d062deb0a94cec74574fea518"
   },
   {
     "path": "desktop/data-import.js",
@@ -176,8 +176,13 @@
   },
   {
     "path": "desktop/main.cjs",
-    "size": 30803,
-    "sha256": "a9f93eb8cf487550dad0aa94a88dbaad06aba9c5553ba0f9cde17e3d7642c789"
+    "size": 31088,
+    "sha256": "33e7702201d07ab16283f4409cafc6d20bb34c08672b860d52e261062df7b820"
+  },
+  {
+    "path": "desktop/model-export-qa.cjs",
+    "size": 7213,
+    "sha256": "f873707f84ff4c74cf4963eb072ca662ae25066d1d7deedd4f8075ce3aba2065"
   },
   {
     "path": "desktop/occlusion-qa.cjs",
@@ -187,7 +192,7 @@
   {
     "path": "desktop/package-lock.json",
     "size": 6055,
-    "sha256": "eb58d4738feb0a3c28ee383c3c7548d7144f627e508bbc052e3d8f821b253abe"
+    "sha256": "c7808cb7c3dabdff238b6fc9db6f8c60cd860f52cfd509c57c545cf6efe6086b"
   },
   {
     "path": "desktop/package-qa.cjs",
@@ -196,8 +201,8 @@
   },
   {
     "path": "desktop/package.json",
-    "size": 1855,
-    "sha256": "40c11f67c61240fe8a897a605ade797a334786703d14a4db1999af9660d204ed"
+    "size": 1891,
+    "sha256": "0c625e644437d6e3189c6c3438f609e245d6f499ec977beb55b5f000b32ebcb4"
   },
   {
     "path": "desktop/pages-qa.cjs",
@@ -221,8 +226,8 @@
   },
   {
     "path": "desktop/preload.cjs",
-    "size": 1975,
-    "sha256": "2b27ee61ced8d184c33f1ab988103895e066f2595bba53913e1888d7b8c1aac8"
+    "size": 2010,
+    "sha256": "78934acce1c2837218cc568bf6f806f5f5da7dab18806204ba1d360a27a29dc9"
   },
   {
     "path": "desktop/qa-extra.cjs",
@@ -266,13 +271,13 @@
   },
   {
     "path": "desktop/studio.html",
-    "size": 38562,
-    "sha256": "0d2def0860b0ca56c77be5ac99facf010c4e1e5fbfcb372b16b3f389e194a857"
+    "size": 42219,
+    "sha256": "fcf6802d102c4c40cfbb6b9e7ce369c860a160cd4cc1f57e1c18d7ecc2187726"
   },
   {
     "path": "desktop/studio.js",
-    "size": 66679,
-    "sha256": "d708a0e9c75999b8b189072cc8c53ab4184e1bbeccd1b828b6f5d091d6a5a3f5"
+    "size": 75435,
+    "sha256": "a7db16bdfb383ec19a2fa58cac90c8d186d3e95ad129cfb70120164d7682759f"
   },
   {
     "path": "desktop/traincheck-qa.cjs",
@@ -331,8 +336,8 @@
   },
   {
     "path": "README.md",
-    "size": 10740,
-    "sha256": "c29a24d42494146d7e540bc881c42b5dc2d53c7b21f3643ed7969a48f23214c0"
+    "size": 11379,
+    "sha256": "cd530f890b0c7de7d9c5520e2cde6237e6f90e9b548982ea50b3fb9ffe18a806"
   },
   {
     "path": "setup-linux.sh",
@@ -3970,6 +3975,11 @@
     "sha256": "375d11c27975dddde0bbf5fdcf50efb207bc473f0eb9e60042f36bae3a2d7123"
   },
   {
+    "path": "X-AnyLabeling/anylabeling/services/workflow/model_export.py",
+    "size": 10981,
+    "sha256": "5c964a46a15a757fa546b23a739fa2f2852ff406fc3807c272e85e1b8ff321c1"
+  },
+  {
     "path": "X-AnyLabeling/anylabeling/services/workflow/predict.py",
     "size": 5498,
     "sha256": "59db0439e72fcb780863504a7884cbdca503242bdeb0ca4a9b8c5dfbe25c52d2"
@@ -4746,13 +4756,18 @@
   },
   {
     "path": "X-AnyLabeling/anylabeling/views/workflow/desktop_controller.py",
-    "size": 35224,
-    "sha256": "dca5e6324a25b426292970760e3989d7c3fe6c5c4c592b6a935925b879e0fec6"
+    "size": 36080,
+    "sha256": "23890242c68ddd38268651bd3a9e20b45d8fbb1cdeeba69fcb7c60db2f5b2f17"
   },
   {
     "path": "X-AnyLabeling/anylabeling/views/workflow/electron_bridge.py",
-    "size": 13175,
-    "sha256": "19eff5828108daae3490fe2c04d78da98c0a2d715190c51723950ca8780d1e1e"
+    "size": 13449,
+    "sha256": "1880137fb5d9c2e892844f8026c2a3118fb2bdf340c8f59fd139900280e19516"
+  },
+  {
+    "path": "X-AnyLabeling/anylabeling/views/workflow/export_job.py",
+    "size": 5442,
+    "sha256": "6338d95be3e0ffa817e14bbe616626274a6aae288d23d18f5dbe63f462f1409f"
   },
   {
     "path": "X-AnyLabeling/anylabeling/views/workflow/inline_tools.py",
@@ -7385,6 +7400,11 @@
     "sha256": "1e7b131136da42da87c9ab4334fa96fdb064419de7e3bc0ddc607d29050ffd56"
   },
   {
+    "path": "X-AnyLabeling/tests/workflow/test_model_export.py",
+    "size": 3623,
+    "sha256": "e36d2d961b7a2cd41298d73d7c2c4ea18cac350913105e912e00c24dd3be531e"
+  },
+  {
     "path": "X-AnyLabeling/tests/workflow/test_occlusion.py",
     "size": 1765,
     "sha256": "73ede9f15c8b9efeafea92e32b9f63c7066af655988f7f92dcfc483668bf2a55"
@@ -7555,6 +7575,16 @@
     "sha256": "7a12017e8a50ea6ac3e17281b243ae6d0078a3106275edb876068510c7685abc"
   },
   {
+    "path": "文档/0.5.1_发布检查.md",
+    "size": 2937,
+    "sha256": "eb78b718b66a06526719d2c1fea2462daafc62749a5dab5b931bef2313f8eb61"
+  },
+  {
+    "path": "文档/0.6.0_可视化模型结构编辑与模块替换_实施方案.md",
+    "size": 23522,
+    "sha256": "1ceeaf091693302d76a92769b7bd63f6e589bf397966b2a89f2e80165a270a03"
+  },
+  {
     "path": "文档/GUI美化与功能扩展_执行方案.md",
     "size": 16006,
     "sha256": "264612df233f9d8b1a502586f69797c2fafda57480c65d32a587ae5c4cceb6da"
@@ -7596,8 +7626,8 @@
   },
   {
     "path": "文档/安装后使用.md",
-    "size": 5402,
-    "sha256": "e58e88eba06690e51a8ba08f268069e93facd136844610b1c2bec34f221d231a"
+    "size": 6397,
+    "sha256": "2de717423cd1f71576ff39f382e986e6273ed3dc92fca2f9eb70810a667847e2"
   },
   {
     "path": "文档/快速保存切图与视频微调总览-20261018.md",
@@ -7618,6 +7648,11 @@
     "path": "文档/标注训练一体化软件_方案与执行目标.md",
     "size": 28772,
     "sha256": "1e2444d3f7bddcd3e3bba2957f7a55036c213ceb1fcd8312fd8b967cb7ad06de"
+  },
+  {
+    "path": "文档/模型转换与量化.md",
+    "size": 3669,
+    "sha256": "e64ba98a1ccd26fb6f1e9de07545a2157fa25b0782b65a8d2a4c514a0d26788e"
   },
   {
     "path": "文档/界面预览/Electron-Dark.png",

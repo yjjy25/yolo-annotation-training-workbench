@@ -1,8 +1,10 @@
-# YOLO 标注训练一体化工具 0.5.0
+# YOLO 标注训练一体化工具 0.5.1
+
+模型转换与量化：打开项目后，进入侧栏“模型转换与量化”，或点击已训练模型旁的“转换 / 量化”。支持 YOLO PT → ONNX FP32 / FP16 / INT8，以及 TorchScript FP32。INT8 需要代表性真实图片进行静态 QDQ 校准，无需手写 YAML；FP16 需要目标设备支持。输出位于项目 `exports/<独立任务目录>`，包含模型和可追溯的 `export.json`，不覆盖原权重。转换在独立进程运行，可查看日志或停止。当前不包含 TensorRT / OpenVINO 导出；转换成功不代表量化后的精度和速度已经通过验证。
 
 基于完整 X-AnyLabeling 4.1.3 源码扩展，使用 Electron 外壳。标注、视频追踪、模型验证和训练在同一个窗口完成。
 
-**0.5.0 包含本轮标注、视频追踪、视频验证及训练进度更新。提供 Windows / Ubuntu 自带运行库安装包与对应源码。**
+**0.5.1 新增模型转换、量化与新手说明弹窗，保留 0.5.0 的标注、视频和训练功能。提供 Windows / Ubuntu 自带运行库安装包与对应源码。**
 
 ## 这次更新
 
@@ -16,8 +18,8 @@
 
 ## 下载与启动
 
-- Windows 10/11 x64：[下载 Windows 离线安装包分卷](https://github.com/yjjy25/yolo-annotation-training-workbench/releases/tag/v0.5.0)。运行后选择位置并解压安装，可创建桌面快捷方式。包含独立 Python、Electron、CPU/CUDA 训练组件，无需另装 Python。程序可整体移动，移动前先退出。
-- Ubuntu x86_64：[下载 Ubuntu DEB 安装包分卷](https://github.com/yjjy25/yolo-annotation-training-workbench/releases/tag/v0.5.0)。通过软件安装器打开；也可执行 `sudo apt install ./AnnotationWorkbench-0.5.0-Ubuntu-amd64.deb`。安装后在应用菜单找到“标注训练工作台”。系统图形库缺失时由 apt 补齐。
+- Windows 10/11 x64：[下载 Windows 离线安装包分卷](https://github.com/yjjy25/yolo-annotation-training-workbench/releases/tag/v0.5.1)。运行后选择位置并解压安装，可创建桌面快捷方式。包含独立 Python、Electron、CPU/CUDA 训练组件，无需另装 Python。程序可整体移动，移动前先退出。
+- Ubuntu x86_64：[下载 Ubuntu DEB 安装包分卷](https://github.com/yjjy25/yolo-annotation-training-workbench/releases/tag/v0.5.1)。通过软件安装器打开；也可执行 `sudo apt install ./AnnotationWorkbench-0.5.1-Ubuntu-amd64.deb`。安装后在应用菜单找到“标注训练工作台”。系统图形库缺失时由 apt 补齐。
 - 源码运行：先按下方“源码开发”准备环境，再双击 `双击启动.vbs` 或运行 `bash start.sh`。
 
 完整离线包超过 GitHub 单文件限制，需要先合并分卷：
@@ -97,7 +99,7 @@ Windows 和 Ubuntu 是不同文件，不能互相替代。离线包体积较大�
 
 上传 GitHub 请使用 `.packaging/package_source.py` 生成的干净源码目录，保留 LICENSE、THIRD_PARTY_NOTICES.md 和上游版权。个人项目、备份、运行库、权重和大型发行包已排除；不要直接上传整个开发目录。安装包放在 Releases。完整版超过 GitHub 单个 Release 文件 2 GiB 限制，使用 `发行包/GitHub-Releases` 中的分卷、parts.json 和 join.py；用户下载同一平台的全部分卷及校验清单后运行 `powershell -ExecutionPolicy Bypass -File .\join.ps1` 或 `bash join.sh Ubuntu`（也提供 Python 重组脚本），将验证 SHA256 并合成原安装包。
 
-0.5.0 安装包与当前验证范围见 [发布检查记录](文档/0.5.0_发布检查.md)。已在现有 Windows 与 WSLg 环境验证的内容不代表全部模型、硬件和 Linux 发行版均已验收。
+0.5.1 安装包与当前验证范围见 [发布检查记录](文档/0.5.1_发布检查.md)。已在现有 Windows 与 WSLg 环境验证的内容不代表全部模型、硬件和 Linux 发行版均已验收。
 
 ## 视频与姿态标注扩展（源码）
 

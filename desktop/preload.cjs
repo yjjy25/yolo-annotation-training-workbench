@@ -14,7 +14,7 @@ contextBridge.exposeInMainWorld('workbench',{
   asset:(name,width)=>ipcRenderer.invoke('desktop:asset',name,width),
   poseReference:options=>ipcRenderer.invoke('desktop:pose-reference',options),
   models:()=>ipcRenderer.invoke('desktop:models'),
-  results:()=>ipcRenderer.invoke('desktop:results'),
+  results:kind=>ipcRenderer.invoke('desktop:results',kind),
   resultImage:(relative,maxWidth)=>ipcRenderer.invoke('desktop:result-image',relative,maxWidth),
   resultVideo:relative=>ipcRenderer.invoke('desktop:result-video',relative),
   validationHistory:()=>ipcRenderer.invoke('desktop:validation-history'),
