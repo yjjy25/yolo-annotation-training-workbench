@@ -31,7 +31,11 @@ if font.is_file():
             if not (font_cache/name).exists():shutil.copy2(font,font_cache/name)
     os.environ["XAL_FONT_FILE"] = str(font)
 os.environ["QT_API"] = "pyqt6"
-sys.path.insert(0, str(ROOT / "X-AnyLabeling"))
+source_root = str(ROOT / "X-AnyLabeling")
+sys.path.insert(0, source_root)
+# Module-based workers must use the same bundled source as the GUI, even when
+# the portable runtime contains an older installed anylabeling distribution.
+os.environ["PYTHONPATH"] = os.pathsep.join(filter(None, [source_root, os.environ.get("PYTHONPATH", "")]))
 os.chdir(ROOT / "X-AnyLabeling")
 
 try:

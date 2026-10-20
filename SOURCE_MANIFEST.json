@@ -46,8 +46,8 @@
   },
   {
     "path": ".packaging/package_source.py",
-    "size": 2947,
-    "sha256": "fe862f0c0df0226efc9c9ca3b5a4ef1540f212de505f280cc6431ee9aeaa45d0"
+    "size": 3016,
+    "sha256": "ce70930b1a837876a81dcd04ef3c6da6ce2c91914734336fa3c08aa78de0694a"
   },
   {
     "path": ".packaging/prepare-linux.sh",
@@ -71,8 +71,8 @@
   },
   {
     "path": ".packaging/构建说明.md",
-    "size": 5572,
-    "sha256": "8dbeaccd9c6bf9ec06ee3ca68723dff5b2adb388a57f6859d17e8cd13277b1c8"
+    "size": 5979,
+    "sha256": "5d88a9f63e6b68817ba16169c398b994425a26988af91eed771aa9394871f27a"
   },
   {
     "path": ".runtime/fonts/NotoSansSC.ttf",
@@ -86,8 +86,8 @@
   },
   {
     "path": ".runtime/launcher.pyw",
-    "size": 2791,
-    "sha256": "5445564b298dcd3c33271d6283660a0cf345ddedd1925bbe9588e8ba120aec71"
+    "size": 3141,
+    "sha256": "24749c30a54fe069791600597dd875a47c194a10370eb8650afde469c9963499"
   },
   {
     "path": ".runtime/python/python312._pth",
@@ -96,18 +96,53 @@
   },
   {
     "path": "CHANGELOG.md",
-    "size": 3409,
-    "sha256": "fe650df3d1d8e9d2711cf748f10867fdfb7a839d062deb0a94cec74574fea518"
+    "size": 4823,
+    "sha256": "8960cab3dabe38c06cd74604bec2847fa2f2f850d47a7dc77ebb075de3ee39ee"
+  },
+  {
+    "path": "desktop/ai-preview-qa.cjs",
+    "size": 10169,
+    "sha256": "f2eec4326e1fb01e666331a8ded9c04ad101998524ced62d8311e225da1b1e13"
+  },
+  {
+    "path": "desktop/ai-preview.js",
+    "size": 5300,
+    "sha256": "e5b84c4ba0ed742686244803ae886fd14a99d7b551a795f66c9cafa8897b8a06"
+  },
+  {
+    "path": "desktop/artifact-manager-qa.cjs",
+    "size": 7658,
+    "sha256": "ddde413e7c9ce51ba50228e27392f03671ba69da4ffc7e64b29ba6af4001c844"
+  },
+  {
+    "path": "desktop/artifact-manager.js",
+    "size": 7152,
+    "sha256": "01671c855ef79c6604228fe78c0e0dfd45558029edc76340f442fbe91354db0d"
+  },
+  {
+    "path": "desktop/canvas-navigation.js",
+    "size": 2451,
+    "sha256": "d217583851579a0fc0268152b44236efe01c36a7d723183c59f0cbe4a0ad1bec"
   },
   {
     "path": "desktop/data-import.js",
-    "size": 2411,
-    "sha256": "2e3518724e1e335e1eb89de305fd7b3c7268ca5b8579d0d37e6bf3a538e98d0e"
+    "size": 2939,
+    "sha256": "db7f982ce4a390cb2f95075b26c36ea0bb5c217581441e32e0935824f0ab4bd7"
+  },
+  {
+    "path": "desktop/dataset-bulk-qa.cjs",
+    "size": 6319,
+    "sha256": "fd4106c68538934e05a0d369ec89ad01c018eadc674f1438cc36e8c174892ed7"
+  },
+  {
+    "path": "desktop/dataset-tools.js",
+    "size": 3976,
+    "sha256": "d775864e104958001fcbe557d7c2f73705625147936b71d7fe7b7fa11f40d9d2"
   },
   {
     "path": "desktop/editor-async.test.cjs",
-    "size": 5116,
-    "sha256": "ed662c7c71ff73b27f15a3d4915fe83ca7be2c96aaabcc442a03adac8f213cbc"
+    "size": 6189,
+    "sha256": "eecf39739615b10393a4e5615e468ca5ee381f154760f96045160cfba405b535"
   },
   {
     "path": "desktop/editor-edge.test.cjs",
@@ -116,13 +151,23 @@
   },
   {
     "path": "desktop/editor.js",
-    "size": 69754,
-    "sha256": "f440dc60cb5d23d7c5e1492543183a69258d694d1d5dcd3fc0ae59477e834232"
+    "size": 72520,
+    "sha256": "2ae10fbcdb8e392ea7803d7be770a79c4cd15a3d39565edefae2711f5a51a80a"
   },
   {
     "path": "desktop/exit-qa.cjs",
     "size": 2943,
     "sha256": "de96db9bb40d5c7ce9d4de8e842918da376ceb3f7fd95a6e7240a8422f80bfe5"
+  },
+  {
+    "path": "desktop/file-picker.cjs",
+    "size": 2952,
+    "sha256": "c5822f6095c51dc5641acb52a16ce2243160063151378344234c595e01915651"
+  },
+  {
+    "path": "desktop/file-picker.test.cjs",
+    "size": 2543,
+    "sha256": "21533b55eeaa5ebf07938a0d9dc73b35927a3e906346268d253a1c3d89cb2399"
   },
   {
     "path": "desktop/hires-qa.cjs",
@@ -176,8 +221,8 @@
   },
   {
     "path": "desktop/main.cjs",
-    "size": 31088,
-    "sha256": "33e7702201d07ab16283f4409cafc6d20bb34c08672b860d52e261062df7b820"
+    "size": 32356,
+    "sha256": "8a1a5251da76d4e6f1ae8906a61be8a876d7552f88e019e8767475c1612b9c2c"
   },
   {
     "path": "desktop/model-export-qa.cjs",
@@ -192,17 +237,17 @@
   {
     "path": "desktop/package-lock.json",
     "size": 6055,
-    "sha256": "c7808cb7c3dabdff238b6fc9db6f8c60cd860f52cfd509c57c545cf6efe6086b"
+    "sha256": "c43a24d24c0d6917228105bc5d270f67a9396e9cde27910ffa070b90f0427acd"
   },
   {
     "path": "desktop/package-qa.cjs",
-    "size": 6377,
-    "sha256": "041e2269fa90d2002da1e791edead02f4c7443684ac93648107e31386071420c"
+    "size": 6743,
+    "sha256": "cc3b90c1f73d534c89469835ed7941dcc53f86d62e99148457a8f5af3d528414"
   },
   {
     "path": "desktop/package.json",
-    "size": 1891,
-    "sha256": "0c625e644437d6e3189c6c3438f609e245d6f499ec977beb55b5f000b32ebcb4"
+    "size": 2446,
+    "sha256": "163f60ec45fa74944c2fb1330a08af6ad139cee649b90c963c713007bd9f1c4e"
   },
   {
     "path": "desktop/pages-qa.cjs",
@@ -221,13 +266,28 @@
   },
   {
     "path": "desktop/pose-regression.test.cjs",
-    "size": 11556,
-    "sha256": "a9bfa7f667fc92e3b8dd4db1472eabf36003a84f05a9f6f786dd868fe6df6e15"
+    "size": 12033,
+    "sha256": "c168c522445ab36fd8380d9f80d66a6a544060f7bb60cf36c1816fe9d0d56dba"
   },
   {
     "path": "desktop/preload.cjs",
-    "size": 2010,
-    "sha256": "78934acce1c2837218cc568bf6f806f5f5da7dab18806204ba1d360a27a29dc9"
+    "size": 2114,
+    "sha256": "a2d6bd4d49ba93d7e8f09b24b186c7a8eba41a836a462c1078b63ecd947d165b"
+  },
+  {
+    "path": "desktop/project-storage-qa.cjs",
+    "size": 10489,
+    "sha256": "7e487eae392e6f9fa886b9d60b1c943168e2e6909a09ae89e4bbe8f18e8f9dc7"
+  },
+  {
+    "path": "desktop/project-storage.js",
+    "size": 10077,
+    "sha256": "5418eb2783e284279c7248f78a39c4797e92503a92d9d2bd59964de680434b4c"
+  },
+  {
+    "path": "desktop/project-transfer.js",
+    "size": 3751,
+    "sha256": "e66ac080788a393affa73df574daf0ba96966dc53ca36afc4e49e7fb729920bd"
   },
   {
     "path": "desktop/qa-extra.cjs",
@@ -235,14 +295,24 @@
     "sha256": "d62c4e62dc7f80f8c37c15057aca6da169a26298663855aa73dff802dbb408fb"
   },
   {
+    "path": "desktop/recycle-assets.cjs",
+    "size": 959,
+    "sha256": "c13c522e9f0e863a4283cb722606a7192e5d3bc1dd34c913983f19cd91c472d0"
+  },
+  {
+    "path": "desktop/recycle-assets.test.cjs",
+    "size": 1215,
+    "sha256": "1e75388b591824a9352a8dcc2271097daf555a250cd13a4710d0de6b3957760b"
+  },
+  {
     "path": "desktop/release-regression.test.cjs",
-    "size": 3215,
-    "sha256": "41ebc55e526a9c8e796999d783cf924e708cf7bcfe366d66288b0415434bcc8f"
+    "size": 3561,
+    "sha256": "a3ea22851658e2a4e79dfb7132829b59261723aaa9d94f674e49b67f741cd02f"
   },
   {
     "path": "desktop/save-advance-qa.cjs",
-    "size": 9452,
-    "sha256": "8d7152ec5fc10a902eb641bef3298e32a424c2830cc31c71250051e8e4c475e6"
+    "size": 11944,
+    "sha256": "902202cdf1ae54f1d60a91c30aa949569268e8621a9825d94bff4a5a30dda261"
   },
   {
     "path": "desktop/shapes-qa.cjs",
@@ -266,18 +336,18 @@
   },
   {
     "path": "desktop/studio.css",
-    "size": 46377,
-    "sha256": "9f575ab591a39b92cdbeb40a998d5f39f18c770c4789ee53889854fa8c72cd73"
+    "size": 52916,
+    "sha256": "74126f76c9883e6d46f54f7755c2c2380dcd043c60ed4383cdbf3d53c3346a54"
   },
   {
     "path": "desktop/studio.html",
-    "size": 42219,
-    "sha256": "fcf6802d102c4c40cfbb6b9e7ce369c860a160cd4cc1f57e1c18d7ecc2187726"
+    "size": 51709,
+    "sha256": "7074ffb835a4202d2c9bddd9dfaa39efd86451af789666612b835feb22adec96"
   },
   {
     "path": "desktop/studio.js",
-    "size": 75435,
-    "sha256": "a7db16bdfb383ec19a2fa58cac90c8d186d3e95ad129cfb70120164d7682759f"
+    "size": 78093,
+    "sha256": "d622ef8f082be74945c50df99d50ea7122ea2547f1ce6df9054cf424feef80c3"
   },
   {
     "path": "desktop/traincheck-qa.cjs",
@@ -300,6 +370,11 @@
     "sha256": "461b98bd8f4c0ce20388974a44322910208b1ab8439eddfde781da3e78a97ddb"
   },
   {
+    "path": "desktop/video-import-qa.cjs",
+    "size": 7161,
+    "sha256": "94bfef91a127d854edace8845968a3c904d24621f9ecb89519e99b8e2b33b968"
+  },
+  {
     "path": "desktop/video-pose-qa.cjs",
     "size": 11214,
     "sha256": "d7d97542b84bc1eeb8785668f5231f8a7ec009d436a53ec4d7a852aeac11548e"
@@ -308,6 +383,11 @@
     "path": "desktop/video-review-qa.cjs",
     "size": 19604,
     "sha256": "ffd3f2159933dccbf04ba6576f2caaa89275670f0b3176a5f4639032c49328b1"
+  },
+  {
+    "path": "desktop/video-selection.js",
+    "size": 926,
+    "sha256": "dd4909c668485626d80960bc46c24cc498e831dfe4f13822c049568598655afb"
   },
   {
     "path": "desktop/video-tracking-fixture.py",
@@ -321,13 +401,13 @@
   },
   {
     "path": "desktop/video-tracking.js",
-    "size": 30953,
-    "sha256": "341ea39eada43d853901b3d727bd39281ab78a9f6117da9562edf07117f72ef0"
+    "size": 33374,
+    "sha256": "1d9790c7f499775d427ae3263593c95e90956d74bda6df6ea1838f95251aa826"
   },
   {
     "path": "desktop/workflow-tools.js",
-    "size": 17683,
-    "sha256": "ba087e3c61b7e770c33f433365bb4c9493394ad06d6ca03277acda7c7a21be62"
+    "size": 18499,
+    "sha256": "092617c6621fca9a9ded75473734bd22ea036d97040e9a56c53ffba3fb0547c3"
   },
   {
     "path": "LICENSE",
@@ -336,8 +416,8 @@
   },
   {
     "path": "README.md",
-    "size": 11379,
-    "sha256": "cd530f890b0c7de7d9c5520e2cde6237e6f90e9b548982ea50b3fb9ffe18a806"
+    "size": 12718,
+    "sha256": "5f3216de31aa4f82ded2dc22683a6712c921a3f54b4afb4d1a7d4958f7c1d805"
   },
   {
     "path": "setup-linux.sh",
@@ -3965,9 +4045,14 @@
     "sha256": "8c6fe22708638d3189eb3236ea01f622947faef32b207971fb044ca4b72339ac"
   },
   {
+    "path": "X-AnyLabeling/anylabeling/services/workflow/artifacts.py",
+    "size": 5005,
+    "sha256": "d1a6f9bab21122a623664355eb34af201cc5072d5ebb828e1636accdaa0ad876"
+  },
+  {
     "path": "X-AnyLabeling/anylabeling/services/workflow/desktop.py",
-    "size": 4499,
-    "sha256": "9be032db185cf5fe8d608aa6b5a566a2da0b3e627593c3b80f72cd5ef5b660c9"
+    "size": 6568,
+    "sha256": "577ae7d6a4d2985abb7357d8cde4c6b5e575cb61da74657e086ffdc31c16e159"
   },
   {
     "path": "X-AnyLabeling/anylabeling/services/workflow/import_data.py",
@@ -3981,8 +4066,8 @@
   },
   {
     "path": "X-AnyLabeling/anylabeling/services/workflow/predict.py",
-    "size": 5498,
-    "sha256": "59db0439e72fcb780863504a7884cbdca503242bdeb0ca4a9b8c5dfbe25c52d2"
+    "size": 6980,
+    "sha256": "dad1c00a57c2aa312c7dac67b3949f88bde5d7ccc56880a3b51fa4f3e5f98ec7"
   },
   {
     "path": "X-AnyLabeling/anylabeling/services/workflow/presets.py",
@@ -3991,8 +4076,23 @@
   },
   {
     "path": "X-AnyLabeling/anylabeling/services/workflow/project.py",
-    "size": 26899,
-    "sha256": "51c5a048c8d19c53baac7a42dedd59fc8f32c19d0e04caa6b17774e0a757ca71"
+    "size": 27950,
+    "sha256": "32958da9e3070fefa880de56010df0122646de400d039bb02eec28708922bd10"
+  },
+  {
+    "path": "X-AnyLabeling/anylabeling/services/workflow/project_storage.py",
+    "size": 4032,
+    "sha256": "55be7055cec4c8fc4e1692e18ed83e8490c41ee75b56a3c7c43a6e646d35383c"
+  },
+  {
+    "path": "X-AnyLabeling/anylabeling/services/workflow/project_transfer.py",
+    "size": 12636,
+    "sha256": "9f9a5b80d02a5c3f6ada1bcb734ca5367dea0db9ac67ee4057e971ad2a76f128"
+  },
+  {
+    "path": "X-AnyLabeling/anylabeling/services/workflow/recycle.py",
+    "size": 9576,
+    "sha256": "c5b88fa2f988284930acf4650b2ef7e343fbf3e76e9e2b0a0af9c8aba0368e7a"
   },
   {
     "path": "X-AnyLabeling/anylabeling/services/workflow/tracking.py",
@@ -4016,8 +4116,8 @@
   },
   {
     "path": "X-AnyLabeling/anylabeling/services/workflow/video_workspace.py",
-    "size": 12386,
-    "sha256": "da408dd211b9240592f4f9bd63e92ac2ea1ca8a0969a97082c6e4e621c70468d"
+    "size": 12894,
+    "sha256": "e4ac684e383fd6978d2affe844b58ddc678faaba339e6d4afbd2f0582eee300e"
   },
   {
     "path": "X-AnyLabeling/anylabeling/views/__init__.py",
@@ -4756,8 +4856,8 @@
   },
   {
     "path": "X-AnyLabeling/anylabeling/views/workflow/desktop_controller.py",
-    "size": 36080,
-    "sha256": "23890242c68ddd38268651bd3a9e20b45d8fbb1cdeeba69fcb7c60db2f5b2f17"
+    "size": 39180,
+    "sha256": "061fad0b7afaaa5e79d5b0b35c66697b20f452f1c135a9e445ef43b69653245a"
   },
   {
     "path": "X-AnyLabeling/anylabeling/views/workflow/electron_bridge.py",
@@ -4781,8 +4881,8 @@
   },
   {
     "path": "X-AnyLabeling/anylabeling/views/workflow/workbench.py",
-    "size": 50100,
-    "sha256": "8ade05c9b542d1205b6f6c4b38208bd8a5c39c053531395944c080d18cf0a239"
+    "size": 51059,
+    "sha256": "d7f5b6f9e752b30556611b3dd1db8c00bcf0201f6f32ee7c035ceab35b06750c"
   },
   {
     "path": "X-AnyLabeling/assets/Annotations/coco_detection.json",
@@ -7380,6 +7480,21 @@
     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
   {
+    "path": "X-AnyLabeling/tests/workflow/test_accept_candidate.py",
+    "size": 2262,
+    "sha256": "4eef9dd749be8dbedeb0810752a93b352f97926222307af1e651bbefaf26ad73"
+  },
+  {
+    "path": "X-AnyLabeling/tests/workflow/test_artifacts.py",
+    "size": 4398,
+    "sha256": "c4d565677cb968db1ea7016af0ce148ac3bf5dba77566371a443d23fd5f26612"
+  },
+  {
+    "path": "X-AnyLabeling/tests/workflow/test_bulk_remove.py",
+    "size": 3116,
+    "sha256": "eaf707f45c93b52f5da6dd6963d2140d1e129ab81c44bea3ec78a136a95f9bf4"
+  },
+  {
     "path": "X-AnyLabeling/tests/workflow/test_desktop.py",
     "size": 14331,
     "sha256": "84306adea5c7cb7850ebbe7e9d62812aeb9d82124c75162ed5b5b420aa446c7d"
@@ -7410,9 +7525,19 @@
     "sha256": "73ede9f15c8b9efeafea92e32b9f63c7066af655988f7f92dcfc483668bf2a55"
   },
   {
+    "path": "X-AnyLabeling/tests/workflow/test_predict_skip_annotated.py",
+    "size": 3796,
+    "sha256": "4f4d67dfde7d6abae165aa9f3850e3067d083356367e84d9302b5e59e25dc605"
+  },
+  {
     "path": "X-AnyLabeling/tests/workflow/test_project.py",
     "size": 10441,
     "sha256": "f8418d35e6bcf89efabd121f7b589abacaa18755c3a3b43b6d5339de0388c4c0"
+  },
+  {
+    "path": "X-AnyLabeling/tests/workflow/test_recycle_transfer.py",
+    "size": 11660,
+    "sha256": "565647e4c4aa1e45801e64c72d23826c53a50455a4fe497684e46afd4d2be80f"
   },
   {
     "path": "X-AnyLabeling/tests/workflow/test_release_regressions.py",
@@ -7443,6 +7568,11 @@
     "path": "X-AnyLabeling/tests/workflow/test_video.py",
     "size": 3452,
     "sha256": "2bf2cd1f8f5b34430163921dd08c5da6080875aaa8f45908da335ec83f72a812"
+  },
+  {
+    "path": "X-AnyLabeling/tests/workflow/test_video_job_lifecycle.py",
+    "size": 2946,
+    "sha256": "7d65102c9cb2e1c884a94eb21b0c8bc9dbc1f6e230e772a155eaaaf6231c5504"
   },
   {
     "path": "X-AnyLabeling/tests/workflow/test_video_review_remove.py",
@@ -7580,6 +7710,11 @@
     "sha256": "eb78b718b66a06526719d2c1fea2462daafc62749a5dab5b931bef2313f8eb61"
   },
   {
+    "path": "文档/0.5.2_发布检查.md",
+    "size": 2885,
+    "sha256": "85097b76d8331abf7a2c00d4eb1d6d867ae077f32f6a8c904750bef45096bf82"
+  },
+  {
     "path": "文档/0.6.0_可视化模型结构编辑与模块替换_实施方案.md",
     "size": 23522,
     "sha256": "1ceeaf091693302d76a92769b7bd63f6e589bf397966b2a89f2e80165a270a03"
@@ -7620,14 +7755,19 @@
     "sha256": "bea9dae6114d3989da35e6a0fab050fa6c3d44c259bb5387e66c9c4d7f2003b8"
   },
   {
+    "path": "文档/发行包保留与清理规则.md",
+    "size": 1480,
+    "sha256": "53ac3a76ac20c65009f5a2b553dc59f364c4b1d6b1f6094cf4023f5e88b4d348"
+  },
+  {
     "path": "文档/姿态标注规范.md",
     "size": 10110,
     "sha256": "b1c0785fc135b79a92c898b78bc5377db73f5e9cef8572948647bf798d74f70d"
   },
   {
     "path": "文档/安装后使用.md",
-    "size": 6397,
-    "sha256": "2de717423cd1f71576ff39f382e986e6273ed3dc92fca2f9eb70810a667847e2"
+    "size": 7472,
+    "sha256": "3ce891f53fd25b13b46b69e4f1c8162be888a9ac9a62740a169e1c3351be67ed"
   },
   {
     "path": "文档/快速保存切图与视频微调总览-20261018.md",

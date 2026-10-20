@@ -20,12 +20,12 @@ let current={event:'state',project:null,training:'idle',predicting:false,embedde
 let nativeDiagnostics=null;
 const diagnosticWaiters=new Map();
 const requests=new Map();
-const rpcMethods=new Set(['create_project','open_project','load_annotation','save_annotation','add_class','mode','start_training','stop_training','predict','stop_predict','accept','start_export','stop_export','start_validation','stop_validation','model_classes','model_info','split_preview','remove_image','import_video','video_status','stop_video','video_sequences','create_tracking','start_tracking','tracking_status','advance_tracking','import_images','tracking_preview','ack_tracking_preview','seek_tracking','accept_tracking_frame','queue_tracking_review','remove_tracking_drafts']);
+const rpcMethods=new Set(['create_project','open_project','load_annotation','save_annotation','add_class','mode','start_training','stop_training','predict','stop_predict','accept','start_export','stop_export','start_validation','stop_validation','model_classes','model_info','split_preview','remove_image','remove_images','export_project','import_project','project_storage','image_removal_plan','cleanup_project','restore_recycle','artifact_inventory','archive_artifacts','import_video','video_status','stop_video','video_sequences','create_tracking','start_tracking','tracking_status','advance_tracking','import_images','tracking_preview','ack_tracking_preview','seek_tracking','accept_tracking_frame','queue_tracking_review','remove_tracking_drafts']);
 function request(method,args={}){
   if(!ready)return Promise.reject(new Error(current.error||'本地引擎正在启动，请稍候。'));
   const request_id=require('node:crypto').randomUUID();
   return new Promise((resolve,reject)=>{
-    const timeout=setTimeout(()=>{requests.delete(request_id);reject(new Error('操作用时较长，请查看日志并核对项目状态后再试。'));},120000);
+    const timeout=setTimeout(()=>{requests.delete(request_id);reject(new Error('操作用时较长，请查看日志并核对项目状态后再试。'));},['export_project','import_project'].includes(method)?1800000:120000);
     requests.set(request_id,message=>{clearTimeout(timeout);message.ok?resolve(message.result):reject(new Error(message.error));});
     send({action:'rpc',method,args,request_id});
   });
@@ -119,7 +119,7 @@ function startBackend(){
   ready=false;
   const handle=win.getNativeWindowHandle();
   const parent=process.platform==='win32'?(handle.length>=8?handle.readBigUInt64LE().toString():String(handle.readUInt32LE())):'0';
-  const profile=process.env.XAL_ELECTRON_QA?path.join(RUNTIME,'electron-qa'):RUNTIME;
+  const profile=process.env.XAL_ELECTRON_QA?path.join(process.env.XAL_QA_STORAGE_ROOT||RUNTIME,'electron-qa'):RUNTIME;
   backend=spawn(python,['-u',path.join(ROOT,'.runtime','launcher.pyw')],{cwd:ROOT,windowsHide:true,stdio:['pipe','pipe','pipe'],env:{...process.env,XAL_ELECTRON:'1',XAL_INTEGRATED_EDITOR:'1',XAL_OFFSCREEN_TOOLS:'1',QT_QPA_PLATFORM:'offscreen',QT_SCALE_FACTOR:'1',XAL_PROFILE_HOME:profile,YOLO_CONFIG_DIR:path.join(profile,'ultralytics'),XAL_FONT_FILE:path.join(ROOT,'.runtime','fonts','NotoSansSC.ttf'),XAL_PRETRAINED_HOME:path.join(ROOT,'.runtime','pretrained'),XAL_EMBED_PARENT:parent,XAL_THEME:nativeTheme.shouldUseDarkColors?'dark':'light',PYTHONIOENCODING:'utf-8'}});
   const startupTimer=setTimeout(()=>{if(!ready&&backend?.exitCode===null){current.error='本地引擎启动超过 60 秒，请查看启动日志。画布直接集成在工具内，无需连接外部服务。';publish();}},60000);
   readline.createInterface({input:backend.stdout}).on('line',line=>{
@@ -148,12 +148,8 @@ ipcMain.handle('desktop:rpc',async(_event,method,args={})=>{
   if(!rpcMethods.has(method))return {ok:false,error:'不支持的操作。'};
   try{return {ok:true,result:await request(method,args)};}catch(error){return {ok:false,error:error.message};}
 });
-ipcMain.handle('desktop:choose',async(_event,kind)=>{
-  if(!['source','root','project','weights','image','images','video'].includes(kind))return null;
-  const options=kind==='source'||kind==='root'?{properties:['openDirectory','createDirectory']}:{properties:kind==='images'?['openFile','multiSelections']:['openFile'],filters:['image','images'].includes(kind)?[{name:'图片',extensions:['png','jpg','jpeg','bmp','webp','tif','tiff']}]:kind==='video'?[{name:'视频',extensions:['mp4','avi','mov','mkv','webm','m4v']}]:[{name:kind==='project'?'项目':'模型',extensions:[kind==='project'?'json':'pt']}]};
-  const selection=await dialog.showOpenDialog(win,options);
-  return selection.canceled?null:kind==='images'?selection.filePaths:selection.filePaths[0];
-});
+const chooseFile=require('./file-picker.cjs').createFilePicker({dialog,getWindow:()=>win,getProject:()=>current.project,projects:path.join(packaged?RUNTIME:ROOT,'我的项目'),prefs,writePrefs});
+ipcMain.handle('desktop:choose',(_event,kind)=>chooseFile(kind));
 ipcMain.handle('desktop:defaults',()=>({projects:path.join(packaged?RUNTIME:ROOT,'我的项目')}));
 ipcMain.on('desktop:native-input',(_event,data)=>{if(data&&typeof data==='object')send({...data,action:'native_input'});});
 ipcMain.on('desktop:native-view',(_event,data)=>{if(data&&typeof data==='object')send({...data,action:'native_view'});});
@@ -163,6 +159,11 @@ ipcMain.handle('desktop:asset',async(_event,name,width)=>{
   if(typeof name!=='string'||path.basename(name)!==name||!current.project)throw new Error('图片名称无效。');
   if(!/\.(png|jpe?g|bmp|webp|tiff?)$/i.test(name))throw new Error('图片格式不支持。');
   return workspaceAssets.read(workspaceImage(name),width);
+});
+ipcMain.handle('desktop:recycle-asset',async(_event,projectRoot,relative,width)=>{
+  if(!current.project||current.project.root!==projectRoot)throw new Error('项目已切换，请重新打开回收站。');
+  const image=require('./recycle-assets.cjs').recycleImage(projectRoot,relative);
+  return workspaceAssets.read(image,Number.isInteger(width)?Math.min(512,Math.max(32,width)):160);
 });
 ipcMain.handle('desktop:models',()=>{
   if(!current.project)return [];
@@ -223,7 +224,7 @@ ipcMain.handle('desktop:validation-history',()=>{
     return fs.readdirSync(directory,{withFileTypes:true}).filter(entry=>entry.isDirectory()).map(entry=>{
       const record=path.join(directory,entry.name,'metrics.json');
       if(!fs.existsSync(record))return null;
-      try{return {id:entry.name,...JSON.parse(fs.readFileSync(record,'utf8'))};}catch{return null;}
+      try{return {...JSON.parse(fs.readFileSync(record,'utf8')),id:entry.name};}catch{return null;}
     }).filter(Boolean).sort((a,b)=>String(b.at||b.id).localeCompare(String(a.at||a.id)));
   }catch{return [];}
 });
@@ -339,9 +340,10 @@ ipcMain.handle('desktop:images',(_event,options={})=>{
   const tile={width:Math.round(300*dpr),height:Math.round(200*dpr)};
   const size=[24,48,96].includes(Number(options.size))?Number(options.size):24;
   try{let entries=fs.readdirSync(directory,{withFileTypes:true}).filter(entry=>entry.isFile()&&/\.(png|jpe?g|webp|bmp|tiff?)$/i.test(entry.name)).filter(entry=>!options.search||entry.name.toLowerCase().includes(String(options.search).toLowerCase())).map(entry=>{
-    let status='unlabeled';try{const data=JSON.parse(fs.readFileSync(path.join(root,'annotations',path.parse(entry.name).name+'.json'),'utf8'));status=data.checked===true?'checked':'draft';}catch{}
-    return {name:entry.name,status};
-  }).filter(entry=>!options.filter||options.filter==='all'||options.filter==='pending'&&entry.status!=='checked'||entry.status===options.filter);
+    let status='unlabeled',annotated=false;try{const data=JSON.parse(fs.readFileSync(path.join(root,'annotations',path.parse(entry.name).name+'.json'),'utf8'));status=data.checked===true?'checked':'draft';annotated=!!data.shapes?.length||Object.values(data.flags||{}).some(v=>v===true);}catch{}
+    let aiCount=null;try{const proposal=JSON.parse(fs.readFileSync(path.join(root,'proposals','latest',path.parse(entry.name).name+'.json'),'utf8'));aiCount=proposal.annotation?.shapes?.length||Object.values(proposal.annotation?.flags||{}).filter(v=>v===true).length;}catch{}
+    return {name:entry.name,status,annotated,aiCount};
+  }).filter(entry=>!options.filter||options.filter==='all'||options.filter==='pending'&&entry.status!=='checked'||entry.status===options.filter||options.filter==='ai'&&entry.aiCount!==null);
   const total=entries.length,pages=Math.max(1,Math.ceil(total/size)),page=Math.min(pages-1,Math.max(0,Number.isInteger(options.page)?options.page:0));
   return {total,pages,page,size,items:entries.slice(page*size,page*size+size).map(entry=>({...entry,thumbnail:thumbnailFor(directory,entry.name,tile)}))};}catch{return {items:[],total:0,pages:1,page:0};}
 });
@@ -370,6 +372,11 @@ ipcMain.handle('desktop:close-ready',(_event,payload)=>{
 let qaStarted=false;
 async function runQA(){
   if(qaStarted)return;qaStarted=true;
+  if(process.env.XAL_QA_STORAGE)return require('./project-storage-qa.cjs')({win,app,backend:()=>backend,request,ready:()=>ready});
+  if(process.env.XAL_QA_ARTIFACTS)return require('./artifact-manager-qa.cjs')({win,app,backend:()=>backend,request,ready:()=>ready});
+  if(process.env.XAL_QA_AIPREVIEW)return require('./ai-preview-qa.cjs')({win,app,backend:()=>backend,request,ready:()=>ready});
+  if(process.env.XAL_QA_DATASETBULK)return require('./dataset-bulk-qa.cjs')({win,app,backend:()=>backend,request,ready:()=>ready});
+  if(process.env.XAL_QA_VIDEOIMPORT)return require('./video-import-qa.cjs')({win,app,backend:()=>backend,request,ready:()=>ready,dialog,chooseFile});
   if(process.env.XAL_QA_MODELEXPORT)return require('./model-export-qa.cjs')({win,app,backend:()=>backend,request,ready:()=>ready,root:ROOT});
   if(process.env.XAL_QA_TRAININGETA)return require('./training-eta-qa.cjs')({win,app,backend:()=>backend,request,ready:()=>ready,root:ROOT});
   if(process.env.XAL_QA_VALIDATIONVIDEO)return require('./validation-video-qa.cjs')({win,app,backend:()=>backend,request,ready:()=>ready,root:ROOT});

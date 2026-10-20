@@ -3,12 +3,30 @@ import json
 import sys
 from pathlib import Path
 
-from .project import Project, digest, template_hash, write_json
+from .project import Project, digest, template_hash, write_json, read_json
+
+
+def has_annotation_or_review(path):
+    if not path.exists():
+        return False
+    try:
+        data = read_json(path)
+        return bool(data.get("checked") or data.get("shapes") or any(value is True for value in data.get("flags", {}).values()))
+    except (OSError, ValueError, TypeError, AttributeError):
+        # An unreadable label is protected, never treated as empty AI input.
+        return True
 
 
 def run(root, weights, device, confidence, aliases=""):
-    from ultralytics import YOLO
     project = Project(root)
+    all_images = project.images
+    images = [image for image in all_images if not has_annotation_or_review(project.annotation(image))]
+    skipped = len(all_images) - len(images)
+    print(f"共 {len(all_images)} 张，跳过已有标注或已审核 {skipped} 张，待预标注 {len(images)} 张。", flush=True)
+    if not images:
+        print("没有需要 AI 预标注的图片，未加载模型。", flush=True)
+        return
+    from ultralytics import YOLO
     model = YOLO(weights)
     task = project.data["task"]
     if model.task != task:
@@ -31,10 +49,14 @@ def run(root, weights, device, confidence, aliases=""):
             raise ValueError("姿态模型缺少匹配的骨点元数据。请从本项目训练结果中选择模型。")
     output = project.root / "proposals" / "latest"
     output.mkdir(parents=True, exist_ok=True)
-    images = project.images
+    generated = 0
     for index, image in enumerate(images):
         annotation_path = project.annotation(image)
         base_hash = digest(annotation_path)  # Capture BEFORE inference, for concurrent-edit protection.
+        if has_annotation_or_review(annotation_path):
+            skipped += 1
+            print(f"跳过 {image.name}：已新增人工标注或审核。", flush=True)
+            continue
         result = model.predict(str(image), device=device, conf=float(confidence), verbose=False)[0]
         height, width = result.orig_shape
         shapes = []
@@ -79,9 +101,14 @@ def run(root, weights, device, confidence, aliases=""):
                                 shape(label, "point", [point], gid, point_score)
         annotation = {"version": "4.1.3", "flags": flags, "shapes": shapes, "imagePath": "../images/" + image.name, "imageData": None, "imageWidth": width, "imageHeight": height, "checked": False}
         proposal = {"model": str(Path(weights).resolve()), "base_hash": base_hash, "task": task, "classes": project.data["classes"], "template": project.data.get("template"), "annotation": annotation}
+        if digest(annotation_path) != base_hash or has_annotation_or_review(annotation_path):
+            skipped += 1
+            print(f"跳过 {image.name}：推理期间标注已变化，保留人工结果。", flush=True)
+            continue
         write_json(output / (image.stem + ".json"), proposal)
+        generated += 1
         print(f"[{index + 1}/{len(images)}] {image.name}：{len(shapes)} 个图形 → 待审核", flush=True)
-    print("批量预标注完成。人工正式标注未更改。", flush=True)
+    print(f"批量预标注完成：生成 {generated} 张候选，跳过 {skipped} 张。人工正式标注未更改。", flush=True)
 
 
 if __name__ == "__main__":

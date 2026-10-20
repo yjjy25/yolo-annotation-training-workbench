@@ -172,6 +172,8 @@ class Project:
             (self.root / "proposals" / "latest" / (stem + ".json"), self.root / "removed" / "proposals" / (stem + ".json"), "proposals/" + stem + ".json"),
         ]
         removed = []
+        archived = []
+        split_before = read_json(self.root/"splits.json").get("assignments",{}) if (self.root/"splits.json").exists() else {}
         for source, destination, label in targets:
             if not source.exists():
                 continue
@@ -182,6 +184,7 @@ class Project:
                 if destination.exists():
                     destination = destination.with_name(destination.stem + "_" + uuid.uuid4().hex[:6] + destination.suffix)
                 shutil.move(str(source), str(destination))
+                archived.append((destination,source))
             removed.append(label)
 
         # A stale split entry would inflate the training/validation counts.
@@ -197,6 +200,10 @@ class Project:
                     dropped += 1
                 if dropped:
                     write_json(splits_path, data)
+        if not purge and archived:
+            from .recycle import record
+            split_after=read_json(splits_path).get("assignments",{}) if splits_path.exists() else {}
+            record(self.root,"图片："+path.name,archived,split_entries={key:value for key,value in split_before.items() if key not in split_after})
         return {"name": path.name, "removed": removed, "split_entries": dropped, "purged": bool(purge)}
 
     def save(self):

@@ -223,4 +223,10 @@ def remove_drafts(project, args):
         for record in originals.values():
             write_json(project.root/"videos"/record["id"]/"manifest.json",record)
         raise
+    from .recycle import record as recycle_record
+    for name in names:
+        original=originals[available[name]["id"]]
+        frame=next(f for f in original["frames"] if f["name"]==name)
+        related=[(target,source) for source,target in moved if source.name==name or source.stem==Path(name).stem or source==cache_path(project,original,frame['frame'])]
+        recycle_record(project.root,"视频帧："+name,related,video_frames=[{"id":original['id'],"frames":[frame],"review_names":[name]}])
     return {"names":names,"count":len(names),"recovery":str(archive)}

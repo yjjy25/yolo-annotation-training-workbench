@@ -1,6 +1,6 @@
 /* Video sequences and project-specific pose reference, sharing the real editor. */
 (() => {
- let sequences=[],sequence=null,poll=null,importing=false,reference=null,highlight=-1,sequenceRoot=null,sequenceToken=0,photoExamples=[],photoHits=[];
+ let sequences=[],sequence=null,importing=false,reference=null,highlight=-1,sequenceRoot=null,sequenceToken=0,photoExamples=[],photoHits=[];
  const timing=s=>Number(s).toFixed(2)+' 秒';
  const selectedSequence=()=>sequences.find(s=>s.id===$('#video-sequence').value);
  async function refreshSequences(){
@@ -17,7 +17,7 @@
  function syncTimeline(){
   if(window.videoTracking?.ownsTimeline()){window.videoTracking.syncTimeline();return;}
   sequence=sequenceRoot===state.project?.root?sequences.find(s=>s.frames.some(f=>f.name===editor.name))||null:null;
-  $('#video-timeline').hidden=!sequence;
+  $('#video-timeline').hidden=page!=='video'||!sequence;
   if(!sequence){
    $('#video-position').value=0;$('#video-position').max=0;
    $('#video-prev').disabled=true;$('#video-next').disabled=true;$('#video-time').textContent='';return;
@@ -44,44 +44,54 @@
  $('#video-sequence').onchange=()=>openFrame(0).catch(e=>toast(e.message));
  $('#video-position').onchange=()=>openFrame(Number($('#video-position').value)).catch(e=>toast(e.message));
  for(const [id,step] of [['#video-prev',-1],['#video-next',1]])$(id).onclick=()=>Promise.resolve(window.videoTracking?.navigate(step)??openFrame(Number($('#video-position').value)+step)).catch(e=>toast(e.message));
- // Reuse A/D, arrows and "approve next" while inside a video, independently of gallery pagination.
+ // Dataset navigation follows the full filtered gallery across video boundaries.
+ // Only the dedicated tracking route owns original-video frame navigation.
  const imageNavigate=editor.callbacks.navigate;
- const videoNavigate=step=>window.videoTracking?.navigate(step)??(sequence?openFrame(Number($('#video-position').value)+step):imageNavigate(step));
- editor.callbacks.navigate=videoNavigate;
- const originalNavigate=navigate;
- navigate=async step=>{if(sequence&&page==='editor')return openFrame(Number($('#video-position').value)+step);return originalNavigate(step);};
+ editor.callbacks.navigate=step=>window.videoTracking?.navigate(step)??imageNavigate(step);
  const originalOpen=editor.open.bind(editor);
  editor.open=async name=>{const opened=await originalOpen(name);syncTimeline();return opened;};
  const originalForget=editor.forget.bind(editor);
  editor.forget=()=>{originalForget();syncTimeline();};
  const originalProject=editor.setProject.bind(editor);
  editor.setProject=project=>{const changed=sequenceRoot!==project?.root;originalProject(project);if(changed){sequence=null;sequences=[];$('#video-timeline').hidden=true;refreshSequences().catch(e=>toast(e.message));}};
- window.showVideoImport=path=>{if(path)$('#video-path').value=path;$('#video-dialog').showModal();};
+ const selection=window.createVideoSelection('video');let cancelImport=false;
+ window.showVideoImport=paths=>{if(paths)selection.set(paths);$('#video-dialog').showModal();};
  $('#video-close').onclick=()=>$('#video-dialog').close();
- $('#video-choose').onclick=async()=>{const path=await api.choose('video');if(path)$('#video-path').value=path;};
- function busy(value){importing=value;$('#video-submit').disabled=value;$('#video-cancel').disabled=!value;for(const id of ['path','choose','start','end','step','limit'])$('#video-'+id).disabled=value;}
- async function checkProgress(){
-  try{
-   const result=await rpc('video_status');
-   $('#video-status').textContent=result.error||({running:`正在抽帧，已暂存 ${result.count||0} 帧…`,completed:`已导入 ${result.count} 帧${result.limited?'（达到本次上限）':''}。每帧需人工标注和审核。`,stopped:result.message||'已取消导入。'}[result.status]||'等待选择视频');
-   if(['completed','failed','stopped'].includes(result.status)){
-    clearInterval(poll);poll=null;busy(false);
-    if(result.status==='completed'){
-     await api.state().then(update);galleryKey='';await loadImages();await refreshSequences();
-     $('#video-dialog').close();$('#video-sequence').value=result.id;await openFrame(0);toast('视频帧已导入，可在画布上逐帧标注。');
-    }
-   }
-  }catch(e){clearInterval(poll);poll=null;busy(false);$('#video-status').textContent=e.message;}
- }
+ $('#video-dialog').addEventListener('cancel',e=>{if(importing)e.preventDefault();});
+ function busy(value){importing=value;$('#video-submit').disabled=value;$('#video-cancel').disabled=!value;for(const id of ['close','path','choose','choose-all','start','end','step','limit'])$('#video-'+id).disabled=value;}
  $('#video-form').onsubmit=async event=>{
-  event.preventDefault();if(importing)return;busy(true);
+  event.preventDefault();if(importing)return;busy(true);cancelImport=false;
+  const paths=selection.get(),completed=[],failed=[],projectRoot=state.project?.root;let total=0,limited=0;
   try{
    await editor.save();
-   await rpc('import_video',{path:$('#video-path').value.trim(),start:Number($('#video-start').value),end:Number($('#video-end').value),step:Number($('#video-step').value),limit:Number($('#video-limit').value)});
-   $('#video-status').textContent='正在打开视频…';poll=setInterval(checkProgress,800);await checkProgress();
-  }catch(e){busy(false);$('#video-status').textContent=e.message;}
+   const settings={start:Number($('#video-start').value),end:Number($('#video-end').value),step:Number($('#video-step').value),limit:Number($('#video-limit').value)};
+   for(let i=0;i<paths.length&&!cancelImport;i++){
+    if(state.project?.root!==projectRoot)throw new Error('项目已切换，已停止批量导入。');
+    const name=paths[i].split(/[\\/]/).pop();
+    try{
+     $('#video-status').textContent=`正在打开 ${i+1}/${paths.length}：${name}…`;
+     await rpc('import_video',{path:paths[i],...settings});
+     if(cancelImport)await rpc('stop_video');
+     let result;
+     do{
+      result=await rpc('video_status');
+      $('#video-status').textContent=`视频 ${i+1}/${paths.length} · ${name} · 已暂存 ${result.count||0} 帧${result.finishing?' · 正在释放视频资源…':''}`;
+      if(!['completed','failed','stopped'].includes(result.status))await new Promise(resolve=>setTimeout(resolve,400));
+     }while(!['completed','failed','stopped'].includes(result.status));
+     if(result.status==='stopped'){cancelImport=true;break;}
+     if(result.status==='failed')throw new Error(result.error||'视频导入失败');
+     completed.push(result);total+=result.count||0;if(result.limited)limited++;
+    }catch(e){failed.push(name+'：'+e.message);}
+   }
+   if(state.project?.root!==projectRoot)throw new Error('项目已切换，导入结果保留在原项目。');
+   await api.state().then(update);galleryKey='';await loadImages();await refreshSequences();
+   const summary=`${cancelImport?'已取消后续导入。':''}已导入 ${completed.length}/${paths.length} 个视频，共 ${total} 帧。`+(limited?`${limited} 个视频达到每视频帧数上限。`:'')+(failed.length?' 失败：'+failed.join('；'):'');
+   $('#video-status').textContent=summary;
+   if(completed.length&&!failed.length&&!cancelImport){$('#video-dialog').close();$('#video-sequence').value=completed[0].id;await openFrame(0);toast(summary);}
+  }catch(e){$('#video-status').textContent=e.message;}
+  finally{busy(false);}
  };
- $('#video-cancel').onclick=async()=>{await rpc('stop_video');$('#video-status').textContent='正在取消，已保存标注不受影响…';};
+ $('#video-cancel').onclick=async()=>{cancelImport=true;try{await rpc('stop_video');$('#video-status').textContent='正在取消，已导入的视频保留，剩余视频不再导入…';}catch(e){$('#video-status').textContent=e.message;}};
 
  const standard=[
   ['目标框与实例','每个对象先画紧贴可见范围的框，同一对象的所有骨点共用实例编号。多个对象分别标注，不能把别的对象骨点连进来。'],

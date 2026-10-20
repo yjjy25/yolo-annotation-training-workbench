@@ -26,6 +26,35 @@ def remove_image(project, name, purge=False):
     return project.remove_image(path, purge=bool(purge))
 
 
+def remove_images(project, args):
+    """Archive dataset images only; validate the entire request before moving files."""
+    if Path(args.get("project_root", "")).resolve() != project.root.resolve():
+        raise ValueError("项目已切换，请重新选择要移除的图片。")
+    available = {p.name for p in project.images}
+    if args.get("all") is True:
+        if args.get("expected_count") != len(available):
+            raise ValueError("图片数量已变化，请重新确认全部移除。")
+        names = sorted(available)
+    else:
+        requested = args.get("names")
+        if not isinstance(requested, list) or any(not isinstance(n, str) for n in requested):
+            raise ValueError("请选择要移除的图片。")
+        names = list(dict.fromkeys(requested))
+        if any(n not in available for n in names):
+            raise ValueError("部分图片已不存在或不属于当前数据集，请刷新后重新选择。")
+    if args.get("purge"):
+        raise ValueError("请先移入回收站，再在回收站中确认永久清空。")
+    purge = False
+    removed, failed = [], []
+    for name in names:
+        try:
+            remove_image(project, name, purge=purge)
+            removed.append(name)
+        except Exception as error:
+            failed.append({"name": name, "error": str(error)})
+    return {"count": len(removed), "names": removed, "failed": failed, "purged":purge}
+
+
 def load_annotation(project, name):
     from .video_workspace import resolve_store
     project=resolve_store(project,name)
@@ -34,6 +63,19 @@ def load_annotation(project, name):
     candidate = project.root / "proposals" / "latest" / (path.stem + ".json")
     return {"annotation":read_json(label) if label.exists() else None,
             "base_hash":digest(label), "proposal":read_json(candidate) if candidate.exists() else None}
+
+
+def accept_candidate(project, name):
+    path = image_path(project, name)
+    candidate = project.root / "proposals" / "latest" / (path.stem + ".json")
+    accepted = candidate.with_suffix(".accepted.json")
+    if not candidate.is_file():
+        if accepted.is_file() and project.annotation(path).is_file():
+            return load_annotation(project, name)
+        raise ValueError("此图片的 AI 候选已不存在，请重新生成候选后再接纳。")
+    project.accept_proposal(path, read_json(candidate))
+    candidate.replace(accepted)
+    return load_annotation(project, name)
 
 
 def save_annotation(project, name, annotation, base_hash, checked=False, automated=False):

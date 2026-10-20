@@ -70,6 +70,18 @@ class DesktopController(QtCore.QObject):
             self.ensure_switchable()
             self.workflow.load_project(Path(args["path"]).parent)
             return True
+        if method in {"export_project", "import_project"}:
+            self.ensure_switchable()
+            if self.validation_job and self.validation_job.state()!=QtCore.QProcess.ProcessState.NotRunning:
+                raise ValueError("验证正在运行，请完成或停止后再迁移项目。")
+            from anylabeling.services.workflow.project_transfer import export_project, import_project
+            if method=="export_project":
+                return export_project(self.project(),args)
+            result=import_project(args)
+            # The Electron canvas owns initial loading. Avoid hidden native label
+            # dialogs stalling an otherwise completed import.
+            self.workflow.load_project(Path(result["root"]), load_image=False)
+            return result
         if method=="load_annotation":
             return storage.load_annotation(self.project(),args["name"])
         if method=="import_video":
@@ -151,6 +163,41 @@ class DesktopController(QtCore.QObject):
                 if not self.workflow.view.dirty:
                     self.workflow.view.load_file(self.workflow.view.image_path)
             return result
+        if method in {"project_storage","image_removal_plan"}:
+            from anylabeling.services.workflow.project_storage import inventory, image_plan
+            return inventory(self.project()) if method=="project_storage" else image_plan(self.project(),args)
+        if method in {"cleanup_project","restore_recycle"}:
+            self.ensure_switchable()
+            if self.validation_job and self.validation_job.state()!=QtCore.QProcess.ProcessState.NotRunning:
+                raise ValueError("验证正在运行，请完成或停止后再清理。")
+            from anylabeling.services.workflow.project_storage import cleanup
+            if method=="restore_recycle":
+                from anylabeling.services.workflow.recycle import restore
+                result=restore(self.project(),args)
+                self.workflow.last_count=None
+                return result
+            return cleanup(self.project(),args)
+        if method=="artifact_inventory":
+            from anylabeling.services.workflow.artifacts import inventory
+            return inventory(self.project(),args["kind"])
+        if method=="archive_artifacts":
+            self.ensure_switchable()
+            if self.validation_job and self.validation_job.state()!=QtCore.QProcess.ProcessState.NotRunning:
+                raise ValueError("验证正在运行，请完成或停止后再删除。")
+            from anylabeling.services.workflow.artifacts import archive
+            result=archive(self.project(),args)
+            if args.get("kind")=="validation" and result["count"]:
+                self.validation={"status":"idle","logs":[],"run":None,"metrics":None}
+            return result
+        if method=="remove_images":
+            self.ensure_switchable()
+            result=storage.remove_images(self.project(),args)
+            self.workflow.last_count=None
+            view=self.workflow.view
+            if view.image_path and Path(view.image_path).name in result["names"]:
+                view.image_path=None
+                view.reset_state()
+            return result
         if method=="remove_image":
             self.ensure_video_idle()
             result=storage.remove_image(self.project(),args["name"],args.get("purge",False))
@@ -188,14 +235,10 @@ class DesktopController(QtCore.QObject):
             self.workflow.stop_predict()
             return True
         if method=="accept":
-            project=self.project()
-            path=storage.image_path(project,args["name"])
-            candidate=project.root/"proposals"/"latest"/(path.stem+".json")
-            from anylabeling.services.workflow.project import read_json
-            project.accept_proposal(path,read_json(candidate))
-            candidate.replace(candidate.with_suffix(".accepted.json"))
+            self.ensure_video_idle()
+            result=storage.accept_candidate(self.project(),args["name"])
             self.workflow.last_count=None
-            return storage.load_annotation(project,args["name"])
+            return result
         if method=="advanced":
             if args.get("panel")=="training" and self.job and self.job.state()!=QtCore.QProcess.ProcessState.NotRunning:
                 raise ValueError("训练已在集成训练页运行，请在该页查看日志或停止。")
@@ -339,7 +382,13 @@ class DesktopController(QtCore.QObject):
         from anylabeling.services.workflow.project import read_json
         if not self.video_payload:return {"status":"idle"}
         result=read_json(self.video_payload.with_name("progress.json"))
-        if result.get("status")=="running" and self.video_job.state()==QtCore.QProcess.ProcessState.NotRunning:
+        active=self.video_job.state()!=QtCore.QProcess.ProcessState.NotRunning
+        # The worker publishes its result before decoder cleanup and interpreter
+        # shutdown. Keep the import lock visible until QProcess actually exits,
+        # otherwise the next item in a batch races ensure_video_idle().
+        if self.video_kind=="import" and active and result.get("status") in {"completed","failed","stopped"}:
+            return {**result,"status":"running","finishing":True,"message":"正在释放视频资源，请稍候…"}
+        if result.get("status")=="running" and not active:
             result={"status":"failed","error":"视频任务进程意外退出，请检查格式后重试。"}
         return result
 

@@ -39,9 +39,11 @@ module.exports=async({win,app,backend,request,diagnostics,ready,testRoot})=>{
    const labels=fs.readdirSync(path.join(project,'annotations')),before=Object.fromEntries(labels.map(n=>[n,hash(path.join(project,'annotations',n))]));
    await request('predict',{weights,device,confidence:.25});await wait(()=>evaluate('state.predicting'));await wait(()=>evaluate('!state.predicting'),120000);
    if(await evaluate('state.prediction_status')!=='completed')throw new Error('Prediction failed');
-   if(fs.readdirSync(path.join(project,'proposals','latest')).filter(n=>n.endsWith('.json')).length!==6)throw new Error('Incomplete proposals');
+   const proposals=fs.readdirSync(path.join(project,'proposals','latest')).filter(n=>n.endsWith('.json')).sort();
+   const expected=fs.readdirSync(path.join(project,'images')).map(n=>path.parse(n).name+'.json').filter(n=>!labels.includes(n)).sort();
+   if(JSON.stringify(proposals)!==JSON.stringify(expected)||expected.length!==4)throw new Error('AI candidates must cover only the four unannotated images');
    if(labels.some(n=>hash(path.join(project,'annotations',n))!==before[n]))throw new Error('Prediction changed formal annotations');
-   result.tasks.push({task,classes,multipleInstances:true,training:training.status,weights,proposals:6,originalsUnchanged:true});save();
+   result.tasks.push({task,classes,multipleInstances:true,training:training.status,weights,proposals:proposals.length,reviewedImagesSkipped:labels.length,originalsUnchanged:true});save();
   }
   result.stage='complete';result.finished=new Date().toISOString();
  }catch(error){result.errors.push(error.stack);try{fs.writeFileSync(path.join(testRoot,'failure.png'),(await win.webContents.capturePage()).toPNG());}catch{}}

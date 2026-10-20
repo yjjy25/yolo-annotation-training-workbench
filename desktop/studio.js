@@ -45,7 +45,7 @@ let state={ready:false,project:null},page='data',items=[],paging={page:0,pages:1
 // Explicit Save confirms review; internal navigation saves remain drafts.
 function toast(message){$('#toast').textContent=message;$('#toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').hidden=true,6000);}
 async function rpc(method,args={}){const result=await api.rpc(method,args);if(!result.ok)throw new Error(result.error);return result.result;}
-window.editor=new AnnotationEditor({rpc,toast,isEditor:()=>page==='editor'||(page==='video'&&!$('#tracking-editor-host').hidden),navigate:step=>navigate(step),prepareNext:()=>window.videoTracking?.prepareSaveNext?.()??prepareDatasetNext(),onSave:()=>{galleryKey='';if(window.videoTracking?.ownsTimeline())return;clearTimeout(saveRefreshTimer);saveRefreshTimer=setTimeout(()=>loadImages().catch(e=>toast(e.message)),160);}});
+window.editor=new AnnotationEditor({rpc,toast,isEditor:()=>page==='editor'||(page==='video'&&!$('#tracking-editor-host').hidden),navigate:step=>navigate(step),prepareNext:()=>window.canvasNavigation?.prepareNext()??window.videoTracking?.prepareSaveNext?.()??prepareDatasetNext(),onSave:()=>{galleryKey='';if(window.videoTracking?.ownsTimeline())return;clearTimeout(saveRefreshTimer);saveRefreshTimer=setTimeout(()=>loadImages().catch(e=>toast(e.message)),160);}});
 const editor=window.editor;
 let saveRefreshTimer;
 
@@ -58,7 +58,7 @@ function go(next){
 }
 async function showPage(next){
  if(page==='validate'&&next!==page)$('#validation-video').pause();
- if(next===page){if(next==='video'||next==='video-review')await window.videoTracking?.refresh();return;}
+ if(next===page){if(next==='models'||next==='train')await window.artifactManager?.refreshModels();if(next==='video'||next==='video-review')await window.videoTracking?.refresh();return;}
 
  const review=next==='review';
  try{
@@ -76,6 +76,7 @@ async function showPage(next){
   if(page==='editor'&&!items.length&&state.project)await loadImages();
   if(page==='editor'){editor.fit();if(!editor.name&&items[0]){await editor.open(items[0].name);renderFilmstrip();}}
   if(page==='train'||page==='models'||page==='export')await refreshModels();
+ if(page==='models'||page==='train')await window.artifactManager?.refreshModels();
   if(page==='export')refreshExportSource();
   if(page==='train')refreshTrainingResults();
   if(page==='data')await loadImages();
@@ -96,7 +97,7 @@ async function confirmRemoval(name,video=false){
  const dialog=$('#remove-image-dialog');
  if(dialog.open)return false;
  $('#remove-image-question').textContent=video?`移除「${name}」的视频微调草稿？`:`把「${name}」移出这个数据集？`;
- $('#remove-image-detail').textContent=video?'草稿移入视频待确认区的 removed 文件夹；数据集中已审核的副本保留。':'图片、标注和训练/验证划分将移入当前项目的 removed 文件夹，可以取回。';
+ $('#remove-image-detail').textContent=video?'草稿移入项目回收站，可恢复；数据集中已审核的副本保留。':'图片、标注和训练/验证划分将移入项目回收站，可单项或批量恢复。';
  $('#remove-image-remember').checked=false;dialog.returnValue='';
  return new Promise(resolve=>{
   dialog.addEventListener('close',()=>{
@@ -119,7 +120,7 @@ async function removeImage(name,quiet=false){
  try{
   // Write pending edits first so they travel into removed/ with the picture.
   if(editor.name===target)await editor.save().catch(()=>{});
-  const result=await rpc('remove_image',{name:target,purge:false});
+  const result=await rpc('remove_image',{name:target,purge:false});window.canvasNavigation?.forget(target);window.datasetTools?.forget(target);
   // Let go of the picture before refreshing, otherwise the filmstrip or the
   // canvas asks for a thumbnail of a file that is already gone.
   if(editor.name===target)editor.forget();
@@ -150,11 +151,13 @@ async function openImage(name){
 function prepareDatasetNext(){
  const origin=page,root=state.project?.root,name=editor.name,filter=$('#image-filter').value,search=$('#image-search').value;
  const size=Number($('#page-size').value)||24;
+ const savedItem=items.find(item=>item.name===name);
  const index=items.findIndex(item=>item.name===name),position=paging.page*size+Math.max(0,index);
  if(items[index+1])editor.prefetchImage(items[index+1].name).catch(()=>{});
  const current=()=>page===origin&&state.project?.root===root&&editor.name===name&&$('#image-filter').value===filter&&$('#image-search').value===search;
  return async()=>{
   if(!current())return;
+  window.canvasNavigation?.save(name,'dataset',savedItem);
   await loadImages();if(!current())return;
   // Saved images disappear from pending/draft filters. Use the pre-save position,
   // rather than finding the vanished image and accidentally restarting the list.
@@ -170,10 +173,11 @@ function prepareDatasetNext(){
   if(paging.page!==targetPage){paging.page=targetPage;await loadImages();}
   if(!current())return;
   const next=items[target%size];
-  if(next&&next.name!==name)await openImage(next.name);
+  if(next&&next.name!==name){await openImage(next.name);if(editor.name===next.name){window.canvasNavigation?.arrive(next.name,'dataset',next);renderFilmstrip();}}
  };
 }
 async function navigate(step){
+ const historical=window.canvasNavigation?.navigate(step,'dataset');if(historical)return historical;
  if(!items.length)return;
  const size=Number($('#page-size').value)||24;
  let index=items.findIndex(item=>item.name===editor.name);
@@ -199,11 +203,19 @@ async function loadImages(){
   items=result.items;paging=result;$('#image-total').textContent=result.total+' 张图片';$('#page-number').textContent=(result.page+1)+' / '+result.pages;$('#prev-page').disabled=!result.page;$('#next-page').disabled=result.page>=result.pages-1;
   const gallery=$('#gallery');gallery.replaceChildren();
   if(!items.length){const box=document.createElement('div');box.className='empty-gallery';const title=document.createElement('strong'),description=document.createElement('p');const emptyProject=state.project&&state.project.counts.total===0;title.textContent=emptyProject?'项目已创建，尚未导入数据':state.project?'没有符合筛选条件的图片':'还没有项目';description.textContent=emptyProject?'点击“导入数据”添加图片或视频，之后开始标注。':state.project?'调整筛选条件或清除搜索词。':'先新建项目，再导入图片或视频。';box.append(title,description);if(emptyProject){const action=document.createElement('button');action.className='primary';action.textContent='导入数据';action.onclick=()=>$('#import-data').click();box.append(action);}if(!state.project){const action=document.createElement('button');action.className='primary';action.textContent='新建项目';action.onclick=()=>showNew();box.append(action);}gallery.append(box);}
-  for(const item of items){const button=document.createElement('button');button.className='image-tile';button.setAttribute('aria-label','标注 '+item.name);const img=document.createElement('img');img.src=item.thumbnail;img.alt=item.name;const detail=document.createElement('div'),name=document.createElement('strong'),status=document.createElement('small');name.textContent=item.name;status.textContent={checked:'已审核',draft:'编辑中',unlabeled:'未标注'}[item.status];status.className=item.status;detail.append(name,status);
-   // Removing from the grid too: an unusable photo is often spotted while
-   // browsing, not only while annotating it.
-   const drop=document.createElement('button');drop.className='tile-remove';drop.type='button';drop.textContent='移除';drop.title='把这张图片移出数据集';drop.onclick=event=>{event.stopPropagation();removeImage(item.name);};
-   button.append(img,detail,drop);button.onclick=()=>openImage(item.name);gallery.append(button);}
+  for(const item of items){
+   const tile=document.createElement('article');tile.className='image-tile';tile.dataset.name=item.name;
+   const button=document.createElement('button');button.type='button';button.className='tile-open';button.setAttribute('aria-label','标注 '+item.name);
+   const img=document.createElement('img');img.src=item.thumbnail;img.alt=item.name;
+   const detail=document.createElement('div'),name=document.createElement('strong'),status=document.createElement('small');detail.className='tile-info';name.textContent=item.name;status.textContent={checked:'✓ 已审核',draft:item.annotated?'● 已标注':'已保存，未标注',unlabeled:'未标注'}[item.status];status.className=item.status;detail.append(name,status);button.append(img,detail);button.onclick=()=>openImage(item.name);
+   const select=document.createElement('input');select.type='checkbox';select.className='tile-select';select.setAttribute('aria-label','选择 '+item.name);select.onchange=()=>window.datasetTools?.select(item.name,select.checked);
+   const drop=document.createElement('button');drop.className='tile-remove';drop.type='button';drop.textContent='移除';drop.title='把这张图片移出数据集';drop.onclick=()=>removeImage(item.name);
+   tile.append(button,select,drop);
+   if(item.aiCount!==null&&item.aiCount!==undefined){const preview=document.createElement('button');preview.type='button';preview.className='tile-ai-preview';preview.textContent=`AI 预览 · ${item.aiCount}`;preview.onclick=()=>window.aiPreview?.open(item.name);tile.append(preview);}
+   gallery.append(tile);
+  }
+  window.datasetTools?.sync();
+  window.aiPreview?.renderTiles();
   renderFilmstrip();
   return items;
  })();
@@ -218,24 +230,32 @@ async function loadImages(){
   return items;
  }finally{if(refreshPending===run)refreshPending=null;}
 }
+function setFilmMarker(button,status,annotated){
+ let badge=button.querySelector('.film-status');if(!badge){badge=document.createElement('span');badge.className='film-status';button.append(badge);}
+ badge.dataset.status=status==='checked'?'checked':annotated?'annotated':'unlabeled';
+ badge.textContent=status==='checked'?'✓ 已审核':annotated?'● 已标注':'○ 未标注';
+ button.title=button.dataset.name+' · '+badge.textContent;
+}
 function renderFilmstrip(){
  const strip=$('#filmstrip'),old=new Map([...strip.children].map(node=>[node.dataset.name,node])),keep=new Set();
- for(const [index,item] of items.entries()){
+ const visible=new Set(items.map(item=>item.name)),retained=(window.canvasNavigation?.retained('dataset')||[]).filter(item=>!visible.has(item.name));
+ for(const [index,item] of [...retained,...items].entries()){
   let button=old.get(item.name);
   if(!button){
    button=document.createElement('button');button.dataset.name=item.name;
    const image=document.createElement('img'),name=document.createElement('small');image.alt=item.name;name.textContent=item.name;
    button.append(image,name);button.onclick=()=>openImage(item.name);
   }
-  const image=button.querySelector('img');if(image.getAttribute('src')!==item.thumbnail)image.src=item.thumbnail;
-  button.className='film-item'+(item.name===editor.name?' selected':'');keep.add(button);
+  const image=button.querySelector('img');if(item.thumbnail&&image.getAttribute('src')!==item.thumbnail)image.src=item.thumbnail;else if(!item.thumbnail&&!image.getAttribute('src')){const imageRoot=state.project?.root;api.asset(item.name,160).then(asset=>{if(state.project?.root===imageRoot)image.src=asset.url;}).catch(()=>{});}
+  button.className='film-item'+(item.name===editor.name?' selected':'');setFilmMarker(button,item.status,item.annotated);keep.add(button);
   if(strip.children[index]!==button)strip.insertBefore(button,strip.children[index]||null);
  }
  for(const button of [...strip.children])if(!keep.has(button))button.remove();
+ window.datasetTools?.markCurrent();
 }
 function update(next){
  if(state.project?.root!==next.project?.root)clearValidationVideo();
- const previous=state;state=next;syncRemovalPreference();document.documentElement.dataset.theme=next.resolvedTheme||'dark';
+ const previous=state;state=next;window.artifactManager?.syncRoot();window.canvasNavigation?.syncRoot();syncRemovalPreference();window.datasetTools?.sync();document.documentElement.dataset.theme=next.resolvedTheme||'dark';
  document.querySelectorAll('button[data-theme]').forEach(b=>b.classList.toggle('selected',b.dataset.theme===next.theme));
  $('#engine-state').textContent=next.ready?'本地引擎就绪':'启动本地引擎…';$('#engine-dot').classList.toggle('ready',!!next.ready);
  $('#notice').hidden=!next.error;$('#notice-text').textContent=next.error||'';
@@ -273,7 +293,7 @@ function update(next){
  // meter and the loss/mAP numbers live instead of frozen until the end.
  if(running&&!trainingPoll){trainingPoll=setInterval(()=>refreshTrainingResults(),2500);}
  if(!running&&trainingPoll){clearInterval(trainingPoll);trainingPoll=null;refreshTrainingResults();}
- if(previous.predicting&&!next.predicting&&editor.name&&!editor.dirty)rpc('load_annotation',{name:editor.name}).then(label=>{editor.proposal=label.proposal;editor.candidate();editor.render();}).catch(e=>toast(e.message));
+ if(previous.predicting&&!next.predicting){galleryKey='';loadImages();if(editor.name&&!editor.dirty){const name=editor.name,root=state.project?.root;rpc('load_annotation',{name}).then(label=>{if(editor.name!==name||state.project?.root!==root||editor.dirty)return;editor.proposal=label.proposal;editor.candidate();editor.render();}).catch(e=>toast(e.message));}}
  if(previous.training_info?.status!==info.status&&info.status==='completed'){modelKey='';refreshModels();refreshTrainingResults(true);toast('训练完成，已在下方显示训练结果图。');}
  if(previous.training_info?.status!==info.status&&info.status==='failed')refreshTrainingResults();
  if(previous.validation_info?.status!==next.validation_info?.status&&next.validation_info?.status==='completed'){refreshValidationPlots();toast('验证完成，右侧显示评估指标。');}
@@ -429,7 +449,8 @@ async function refreshValidationPlots(){
  const history=$('#validate-history'),wrap=$('#validate-history-wrap');
  history.replaceChildren();
  wrap.hidden=!records.length;
- for(const record of records.slice(0,8)){
+ window.artifactManager?.validationRecords(records);
+ for(const record of records){
   const row=document.createElement('div');row.className='history-row';
   const when=document.createElement('span');when.textContent=(record.at||record.id)+' · '+(record.weights?record.weights.split(/[\\/]/).pop():'');
   const score=document.createElement('strong');
@@ -438,11 +459,11 @@ async function refreshValidationPlots(){
   score.textContent=headline!=null?('mAP/准确率 '+(headline*100).toFixed(1)+'%'):'—';
   const open=document.createElement('button');open.type='button';open.className='text-button';open.textContent=record.video?'播放结果视频':'查看结果图';
   open.onclick=()=>{state.validationMetrics=metrics;renderValidation(state.validationInfo,state.project);showValidationPlots(record);};
-  row.append(when,score,open);history.append(row);
+  row.append(when,score,open);window.artifactManager?.decorateValidation(row,record);history.append(row);
  }
  const latest=records[0];
  if(latest)showValidationPlots(latest);
- else clearValidationVideo();
+ else{clearValidationVideo();$('#validate-plots').replaceChildren();$('#validate-plots-wrap').hidden=true;}
 }
 let validationVideoToken=0;
 function clearValidationVideo(){
@@ -499,7 +520,7 @@ async function refreshModels(){
  if(exportKept&&[...exportSelect.options].some(o=>o.value===exportKept))exportSelect.value=exportKept;
  if(!exportSelect.options.length)addOption(exportSelect,'','请选择本地 PT 权重或先训练模型');
  const list=$('#trained-models');list.replaceChildren();if(!records.length){const p=document.createElement('p');p.className='muted';p.textContent='训练完成后，best.pt 会出现在这里。';list.append(p);}
- for(const record of records){const row=document.createElement('div');row.className='model-row';const name=document.createElement('span');name.textContent=record.name;name.title=record.weights;const use=document.createElement('button');use.textContent='用于预标注';use.onclick=async()=>{$('#predict-model').value=record.weights;await rpc('mode',{mode:'trained'});go('models');};const convert=document.createElement('button');convert.textContent='转换 / 量化';convert.onclick=async()=>{await go('export');$('#export-model').value=record.weights;refreshExportSource();};row.append(name,use,convert);list.append(row);}
+ for(const record of records){const row=document.createElement('div');row.className='model-row';const name=document.createElement('span');name.textContent=record.name;name.title=record.weights;const use=document.createElement('button');use.textContent='用于预标注';use.onclick=async()=>{$('#predict-model').value=record.weights;await rpc('mode',{mode:'trained'});go('models');};const convert=document.createElement('button');convert.textContent='转换 / 量化';convert.onclick=async()=>{await go('export');$('#export-model').value=record.weights;refreshExportSource();};row.append(name,use,convert);window.artifactManager?.decorateTrained(row,record);list.append(row);}
 }
 async function localWeights(select){const path=await api.choose('weights');if(path){addOption($(select),path,path.split(/[\\/]/).pop()+' · 本地权重');$(select).value=path;}}
 function chooseTask(task){newTask=task;newShape=(taskShapes[task]||taskShapes.detect)[0].id;document.querySelectorAll('[data-task]').forEach(b=>b.classList.toggle('selected',b.dataset.task===task));$('#new-task-hint').textContent=taskHints[task];$('#new-pose-fields').hidden=task!=='pose';if(task==='pose'&&['目标','person','dog'].includes($('#new-classes').value))$('#new-classes').value=$('#new-preset').value==='dog'?'dog':'person';renderShapes();}

@@ -50,4 +50,13 @@ function make(){
  await Promise.all(Array.from({length:25},()=>e.approve()));
  assert.equal(prepared,1);assert.equal(advanced,1);assert.equal(e.name,'chosen-successor');
  console.log('PASS Save captures its successor once before confirmation and advances outside the save lock');
+ ({e,calls}=make());e.data={shapes:[],flags:{}};e.proposal={annotation:{shapes:[{label:'object',points:[[1,1],[5,1],[5,5],[1,5]]}]}};e.render=()=>{};
+ const acceptedData=structuredClone(e.proposal.annotation);e.callbacks.rpc=async(method,args)=>{calls.push({method,...args});await pause(15);return {annotation:acceptedData,base_hash:'accepted-hash',proposal:null};};
+ await Promise.all(Array.from({length:20},()=>e.accept()));
+ assert.equal(calls.filter(c=>c.method==='accept').length,1);assert.equal(e.data.shapes.length,1);assert.equal(e.proposal,null);assert.equal(e.baseHash,'accepted-hash');
+ assert.equal(e.name,'old');assert.equal(e.dirty,false);
+ console.log('PASS candidate acceptance updates the same visible image and deduplicates clicks');
+ ({e,calls}=make());e.data={shapes:[],flags:{}};e.proposal={annotation:{shapes:[{}]}};
+ assert.equal(await e.confirmSave(),false);assert.equal(calls.length,0,'Unaccepted AI shapes must never be saved as an empty negative image');
+ console.log('PASS unaccepted AI suggestions block empty-negative confirmation');
 })().catch(error=>{console.error(error);process.exitCode=1;});

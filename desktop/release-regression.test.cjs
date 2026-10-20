@@ -16,10 +16,10 @@ vm.runInContext("thumbnailFor('/project-a/images','same.png',tile)",ctx);
 assert.equal(encodes,2,'A repeated request should use the cache');
 console.log('Passed cross-project thumbnail and cache regression');
 
-// Mixed projects must show video controls only for the displayed video frame.
+// Annotation canvas hides video controls; video route keeps frame navigation.
 const workflow=fs.readFileSync(path.join(__dirname,'workflow-tools.js'),'utf8');
 const nodes=new Map(),getNode=selector=>{if(!nodes.has(selector))nodes.set(selector,{value:'',max:0,disabled:false,hidden:false,textContent:'',insertBefore(){}});return nodes.get(selector);};
-const videoContext={window:{},state:{project:{root:'project-a'}},editor:{name:'clip-0.jpg'},$:getNode};
+const videoContext={page:'video',window:{},state:{project:{root:'project-a'}},editor:{name:'clip-0.jpg'},$:getNode};
 vm.createContext(videoContext);
 vm.runInContext(workflow.slice(workflow.indexOf(' let sequences='),workflow.indexOf(' async function openFrame')),videoContext);
 vm.runInContext("sequenceRoot='project-a';sequences=[{id:'clip',frames:[{name:'clip-0.jpg',frame:0,seconds:0},{name:'clip-1.jpg',frame:10,seconds:1}]}];syncTimeline()",videoContext);
@@ -38,4 +38,6 @@ videoContext.state.project.root='project-b';vm.runInContext('syncTimeline()',vid
 assert.equal(getNode('#video-timeline').hidden,true,'A sequence from another project must never appear');
 videoContext.state.project.root='project-a';videoContext.editor.name=null;vm.runInContext('syncTimeline()',videoContext);
 assert.equal(getNode('#video-timeline').hidden,true,'Clearing the canvas must clear the timeline');
-console.log('Passed mixed photo/video timeline and project isolation regression');
+videoContext.state.project.root='project-a';videoContext.editor.name='clip-0.jpg';videoContext.page='editor';vm.runInContext('syncTimeline()',videoContext);
+assert.equal(getNode('#video-timeline').hidden,true,'Annotation canvas must hide the timeline even for video frames');
+console.log('Passed canvas timeline hiding, video navigation and project isolation regression');

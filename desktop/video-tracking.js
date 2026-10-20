@@ -19,7 +19,8 @@
   $('.editor-grid').inert=false;$('.editor-toolbar').inert=busy;
   for(const selector of ['.filmstrip','.inspector','#canvas-host'])$(selector).inert=busy;
   $('#tracking-stop').disabled=!busy||pending;$('#tracking-run').disabled=busy||!active();
-  $('#tracking-create').disabled=busy||!state.project||state.project.task==='classify';
+  $('#tracking-create').disabled=running()||!state.project||state.project.task==='classify';
+  for(const id of ['path','choose','choose-all','start','end','interval','profile'])$('#tracking-'+id).disabled=running();
   $('#tracking-last').disabled=busy||!active();
   $('#tracking-forward').disabled=busy||!active();
   $('#tracking-run-mode').disabled=busy;
@@ -38,10 +39,11 @@
   $('#save-annotation').textContent=staged?'保存视频草稿':'保存草稿';
   $('#approve-annotation').textContent=staged?'确认当前帧，加入数据集':'确认无误，下一张 →';
   const inVideo=page==='video';
-  $('#approve-annotation').hidden=inVideo;
+  $('#approve-annotation').hidden=true;
   $('#remove-image').hidden=inVideo||!!staged;
   $('.approve-switch').hidden=true;
-  $('#save-annotation').textContent=inVideo?'保存并确认当前帧':'保存审核，下一张 →';
+  $('#save-annotation').textContent=inVideo?'保存当前帧':'保存，下一张 →';
+  $('#save-annotation').title=inVideo?'保存即确认并审核当前帧，加入数据集（S / Ctrl+S）':'保存即确认并审核，完成后下一张（S / Ctrl+S）';
   $('#canvas-source').hidden=inVideo||!reviewFrames().length;
   $('#canvas-source').value=reviewing?'video-review':'images';
   $('#canvas-review-note').hidden=page!=='editor'||!reviewing;
@@ -163,18 +165,28 @@
   }catch(e){restorePreview();job={status:'failed',error:e.message};try{await rpc('stop_video');}catch{}window.refreshVideoSequences?.().catch(()=>{});sync();}
   finally{pending=false;polling=false;sync();}
  }
- $('#tracking-choose').onclick=async()=>{const path=await api.choose('video');if(path)$('#tracking-path').value=path;};
+ const selection=window.createVideoSelection('tracking');window.setTrackingVideos=selection.set;
  $('#tracking-new-project').onclick=async()=>{try{await showNew();creatingProject=true;}catch(e){toast(e.message);}};
  $('#project-dialog').addEventListener('cancel',()=>{creatingProject=false;});
  $('#close-project-dialog').addEventListener('click',()=>{creatingProject=false;});
  $('#tracking-form').onsubmit=async event=>{
   event.preventDefault();if(running())return;
-  pending=true;lock();$('#tracking-create-status').textContent='正在读取视频首帧…';
+  pending=true;lock();const paths=selection.get(),created=[],failed=[];
+  const projectRoot=state.project?.root;
   try{
    await editor.save();
-   const record=await rpc('create_tracking',{path:$('#tracking-path').value.trim(),start:Number($('#tracking-start').value),end:Number($('#tracking-end').value),interval:Number($('#tracking-interval').value),profile:$('#tracking-profile').value});
-   pending=false;await api.state().then(update);galleryKey='';await loadImages();await refresh();await openRecord(record);
-   $('#tracking-create-status').textContent='已导入，直接在此页标记首帧。';
+   const settings={start:Number($('#tracking-start').value),end:Number($('#tracking-end').value),interval:Number($('#tracking-interval').value),profile:$('#tracking-profile').value};
+   for(let i=0;i<paths.length;i++){
+    if(state.project?.root!==projectRoot)throw new Error('项目已切换，已停止批量导入。');
+    $('#tracking-create-status').textContent=`正在导入 ${i+1}/${paths.length}：${paths[i].split(/[\\/]/).pop()}`;
+    try{created.push(await rpc('create_tracking',{path:paths[i],...settings}));}
+    catch(e){failed.push(paths[i].split(/[\\/]/).pop()+'：'+e.message);}
+   }
+   if(state.project?.root!==projectRoot)throw new Error('项目已切换，导入结果保留在原项目。');
+   pending=false;await api.state().then(update);galleryKey='';await loadImages();await refresh();
+   if(created.length)await openRecord(created[0]);
+   $('#tracking-create-status').textContent=`已导入 ${created.length}/${paths.length} 个视频。可从列表切换，分别标注首帧。`+(failed.length?' 失败：'+failed.join('；'):'');
+   if(failed.length)$('#tracking-library').open=true;
   }catch(e){$('#tracking-create-status').textContent=e.message;}
   finally{pending=false;render();}
  };
@@ -266,7 +278,8 @@
  renderFilmstrip=()=>{
   ++stripToken;
   if(page!=='video'&&!reviewing){$('.filmstrip-title').firstChild.textContent='图片 ';return previousFilmstrip();}
-  const frames=page==='video'?(active()?.frames||[]):reviewFrames(),projectRoot=state.project?.root;
+  const pendingFrames=reviewFrames(),visible=new Set(pendingFrames.map(f=>f.name)),retained=(window.canvasNavigation?.retained('review')||[]).filter(f=>!visible.has(f.name));
+  const frames=page==='video'?(active()?.frames||[]):[...retained,...pendingFrames],projectRoot=state.project?.root;
   $('.filmstrip-title').firstChild.textContent=page==='video'?'视频帧 ':'待微调 ';
   const host=$('#filmstrip'),old=new Map([...host.children].map(node=>[node.dataset.name,node]));
   const at=frames.findIndex(f=>f.name===editor.name),start=Math.max(0,at-10),wanted=frames.slice(start,start+22),keep=new Set();
@@ -278,10 +291,15 @@
     button.onclick=()=>page==='video'?seekFrame(frame.frame,frame.record?.id||active()?.id):openReview(frame.name);
     reviewThumbnail(frame.name,160).then(asset=>{if(state.project?.root===projectRoot)photo.src=asset.url;}).catch(()=>{photo.alt='缩略图读取失败，可点击重试';});
    }
-   button.className='film-item'+(frame.name===editor.name?' selected':'');keep.add(button);
+   button.className='film-item'+(frame.name===editor.name?' selected':'');
+   if(!button.querySelector('.film-status')){setFilmMarker(button,'unlabeled',false);rpc('load_annotation',{name:frame.name}).then(result=>{if(state.project?.root!==projectRoot)return;const data=result.annotation;setFilmMarker(button,frame.historySaved||frame.record?.accepted?.[frame.name]||data?.checked?'checked':'draft',!!data?.shapes?.length||Object.values(data?.flags||{}).some(v=>v===true));window.datasetTools?.markCurrent();}).catch(()=>{});}
+   if(frame.historySaved)setFilmMarker(button,'checked',frame.annotated);
+   button.querySelector('small').textContent=`原帧 ${frame.frame} · ${frame.historySaved||frame.record?.accepted?.[frame.name]?'已审核，可回看':'待确认'}`;
+   keep.add(button);
    if(host.children[i]!==button)host.insertBefore(button,host.children[i]||null);
   }
   for(const button of [...host.children])if(!keep.has(button))button.remove();
+  window.datasetTools?.markCurrent();
  };
  function prepareSaveNext(){
   if(page==='video')return async()=>{}; // Keep the current seed available for tracking.
@@ -291,9 +309,10 @@
   if(successors[0])editor.prefetchImage(successors[0]).catch(()=>{});
   return async()=>{
    if(page!=='editor'||state.project?.root!==root||editor.name!==name)return;
+   const record=active(),frame=record?.frames.find(f=>f.name===name);window.canvasNavigation?.save(name,'review',{record,...frame});
    const remaining=new Set(reviewFrames().map(f=>f.name));
    const next=successors.find(n=>remaining.has(n))||reviewFrames().find(f=>f.name!==name)?.name;
-   if(next)await openReview(next);
+   if(next){await openReview(next);if(editor.name===next){const record=active(),frame=record?.frames.find(f=>f.name===next);window.canvasNavigation?.arrive(next,'review',{record,...frame});renderFilmstrip();}}
    else{renderFilmstrip();sync();toast('视频待微调已全部审核完成，当前画面已保留。');}
   };
  }
@@ -358,6 +377,7 @@
  function navigateFrame(step){
   if(page==='video'&&active())return seekFrame(Number($('#video-position').value)+step);
   if(page==='editor'&&reviewing){
+   const historical=window.canvasNavigation?.navigate(step,'review');if(historical)return historical;
    const frames=reviewFrames(),at=frames.findIndex(f=>f.name===editor.name),frame=frames[Math.max(0,Math.min(frames.length-1,at+step))];
    return frame?openReview(frame.name):Promise.resolve();
   }
@@ -441,8 +461,8 @@
    await editor.save();
    const result=await rpc('remove_tracking_drafts',{names});
    if(result.names.includes(editor.name)){editor.forget();canvasName=null;}
-   for(const name of result.names)reviewSelection.delete(name);
-   await refresh();toast(`已移除 ${result.count} 张视频待微调帧，可从视频待确认区的 removed 文件夹取回。`);
+   for(const name of result.names){reviewSelection.delete(name);window.canvasNavigation?.forget(name);}
+   await refresh();toast(`已移除 ${result.count} 张视频待微调帧，可在“数据与标注 → 回收站”恢复。`);
   }catch(e){toast(e.message);}finally{removingFrames=false;renderReviewGallery();}
  }
  $('#review-overview').onclick=()=>go('video-review');
@@ -459,6 +479,6 @@
  };
  const previousProject=editor.setProject.bind(editor);
  editor.setProject=project=>{if(root!==project?.root){videoName=null;canvasName=null;reviewing=false;reviewPage=0;reviewSelection.clear();reviewThumbnails.clear();localAccepted.clear();clearTimeout(reviewSyncTimer);}previousProject(project);if(root!==project?.root)refresh().catch(e=>toast(e.message));};
- window.videoTracking={refresh,sync,prepareSaveNext,seekFrame,syncTimeline,acceptCurrent,beforeNavigate,mount,navigate:navigateFrame,ownsTimeline:()=>page==='video'||reviewing,imageOpened:name=>{if(!reviewFrames().some(f=>f.name===name))reviewing=false;canvasName=name;sync();},createdProject:()=>{if(!creatingProject)return false;creatingProject=false;go('video');return true;}};
+ window.videoTracking={refresh,sync,openReview,isAccepted:name=>records.some(r=>r.accepted?.[name]?.source_hash===editor.baseHash),prepareSaveNext,seekFrame,syncTimeline,acceptCurrent,beforeNavigate,mount,navigate:navigateFrame,ownsTimeline:()=>page==='video'||reviewing,imageOpened:name=>{if(!reviewFrames().some(f=>f.name===name))reviewing=false;canvasName=name;sync();},createdProject:()=>{if(!creatingProject)return false;creatingProject=false;go('video');return true;}};
  refresh().catch(e=>toast(e.message));setInterval(tick,80);
 })();

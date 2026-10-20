@@ -17,7 +17,7 @@ files = []
 for folder in ('X-AnyLabeling', 'desktop', '文档', '.github'):
     for base, dirs, names in os.walk(ROOT / folder):
         dirs[:] = [d for d in dirs if d not in EXCLUDED and not d.endswith('.egg-info')]
-        files.extend(Path(base)/n for n in names if n not in LOCAL_DOCS and not n.endswith(('.pyc', '.pt', '.onnx', '.log')))
+        files.extend(Path(base)/n for n in names if n not in LOCAL_DOCS and not n.startswith(('磁盘清理记录_', '清理确认清单_')) and not n.endswith(('.pyc', '.pt', '.onnx', '.log')))
 files += [ROOT/n for n in ('README.md', 'CHANGELOG.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md', '.gitignore', '.gitattributes', 'setup-windows.ps1', '双击启动.vbs', 'setup-linux.sh', 'start.sh', '.runtime/launcher.pyw', '.runtime/python/python312._pth')]
 files += list((ROOT / '.runtime/fonts').glob('*'))
 files += [ROOT/'.packaging'/n for n in ('join.ps1','join.sh')]

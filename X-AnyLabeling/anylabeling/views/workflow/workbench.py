@@ -488,7 +488,7 @@ class Workbench(QtCore.QObject):
             except Exception as error:
                 self.error(error)
 
-    def load_project(self, root):
+    def load_project(self, root, load_image=True):
         if not self.view.may_continue():
             return
         project = Project(root)
@@ -502,7 +502,7 @@ class Workbench(QtCore.QObject):
         self.view.load_labels(project.data["classes"])
         self.class_box.clear()
         self.class_box.addItems(project.data["classes"])
-        self.view.import_image_folder(str(project.root / "images"))
+        self.view.import_image_folder(str(project.root / "images"), load=load_image)
         self.title.setText(project.data["name"])
         self.last_image = None
         self.last_count = None

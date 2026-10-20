@@ -31,7 +31,7 @@
    placement.add(new Option('模板放置','template'));placement.add(new Option('顺序点选','sequence'));
    const placementRow=document.createElement('label');placementRow.className='pose-placement-row';const placementLabel=document.createElement('span');placementLabel.textContent='放置方式';placementRow.append(placementLabel,placement);$('#pose-controls').insertBefore(placementRow,$('#pose-progress'));
    placement.onchange=()=>{this.rememberPreferences();this.hint();};
-   const notice=document.createElement('p');notice.id='dirty-notice';notice.className='dirty-notice';notice.hidden=true;notice.textContent='有未保存的修改 · S / Ctrl+S 保存并审核，或点“确认无误，下一张”';notice.onclick=()=>this.approve();
+   const notice=document.createElement('p');notice.id='dirty-notice';notice.className='dirty-notice';notice.hidden=true;notice.textContent='有未保存的修改 · S / Ctrl+S 保存并审核，或点“保存，下一张”';notice.onclick=()=>this.approve();
    $('.canvas-area')?.append(notice);
    new ResizeObserver(()=>this.fit()).observe($('#canvas-host'));
    this.canvas.addEventListener('pointerdown',e=>this.down(e));this.canvas.addEventListener('pointermove',e=>this.move(e));this.canvas.addEventListener('pointerup',e=>this.up(e));this.canvas.addEventListener('pointercancel',()=>this.cancelDrag());
@@ -40,6 +40,13 @@
    // drag a selection box instead, the menu is simply suppressed.
    this.canvas.addEventListener('dblclick',()=>this.finishPolygon());this.canvas.addEventListener('contextmenu',e=>{e.preventDefault();if(this.suppressContextMenu){this.suppressContextMenu=false;return;}this.finishPolygon();});
    this.canvas.addEventListener('wheel',e=>this.wheel(e),{passive:false});
+   // Capture this app shortcut before focused controls or bubbling handlers.
+   document.addEventListener('keydown',e=>{
+    if(!e.altKey&&!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&!e.isComposing&&e.key.toLowerCase()==='e'&&this.callbacks.isEditor()&&!document.querySelector('dialog[open]')){
+     const typing=e.target.isContentEditable||e.target.tagName==='TEXTAREA'||e.target.tagName==='INPUT'&&!['checkbox','radio','button'].includes(e.target.type);
+     if(!typing){e.stopImmediatePropagation();this.key(e);}
+    }
+   },true);
    document.addEventListener('keydown',e=>this.key(e));
    $('#tool-select').onclick=()=>this.setMode('select');$('#tool-draw').onclick=()=>{if(this.project?.task==='classify')this.classify();else this.setMode('draw');};
    $('#finish-polygon').onclick=()=>this.finishPolygon();$('#undo').onclick=()=>this.undo();$('#redo').onclick=()=>this.redo();$('#fit-image').onclick=()=>this.fit();
@@ -187,12 +194,12 @@
     if(kind==='polygon')text='逐点点击勾画轮廓，点多少下都行 · 结束时：点回第一个点 / 双击 / Enter / 右键 · 结束前只是虚线草稿';
     else if(kind==='circle')text='第 1 步：点一下确定圆心 · 第 2 步：移动鼠标调高矮胖瘦（或按 ↑↓←→），再点一下确定';
     else if(kind==='brush')text='按住鼠标左键并移动即可涂画轮廓 · 松开完成 · 适合快速圈出不规则目标';
-    else if(kind==='rectangle')text='拖动画矩形框 · 拖动已有顶点可直接改框 · Tab 切换标签';
+    else if(kind==='rectangle')text='拖动画矩形框 · 拖动已有顶点可直接改框 · Q 切换标签';
     else if(kind==='rotation')text='拖出矩形，选择后拖动上方旋转手柄调整方向';
    }
    if(this.pose){const t=this.project.template;text='点击骨点 '+(this.pose.index+1)+' / '+t.points.length+'：'+(t.display||t.points)[this.pose.index];}
    $('#tool-hint').textContent=text;
-   $('#shortcut-hint').textContent='A/D 切图 · Enter 审核 · S 保存 · Tab 下个标签 · Shift+Tab 上个标签 · V 选择 / R 画图 · Ctrl+Z 撤销';
+   $('#shortcut-hint').textContent='A/D 切图 · Enter 审核 · S 保存 · Q 下个标签 · Shift+Q 上个标签 · V 选择 / R 画图 · Ctrl+Z 撤销';
    // The button stays available whenever a contour is open so it cannot be missed.
    const finish=$('#finish-polygon');
    if(finish){
@@ -786,7 +793,13 @@
   key(e){
    const typing=e.target.isContentEditable||e.target.tagName==='TEXTAREA'||e.target.tagName==='INPUT'&&!['checkbox','radio','button'].includes(e.target.type);
    const modal=!!document.querySelector('dialog[open]');
-   if(this.callbacks.isEditor()&&!modal&&!typing&&(this.project?.classes.length||0)>1&&e.key==='Tab'&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();if(!e.repeat)this.cycleClass(e.shiftKey?-1:1);return;}
+   if(!e.altKey&&!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&!e.isComposing&&e.key.toLowerCase()==='e'){
+    if(this.callbacks.isEditor()&&!modal&&!typing){
+     e.preventDefault();window.getSelection?.()?.removeAllRanges();if(!e.repeat&&this.proposal&&!this.accepting)this.accept();
+    }
+    return;
+   }
+   if(this.callbacks.isEditor()&&!modal&&!typing&&(this.project?.classes.length||0)>1&&e.key.toLowerCase()==='q'&&!e.isComposing&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();if(!e.repeat)this.cycleClass(e.shiftKey?-1:1);return;}
    if(e.code==='Space'&&!/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)&&this.callbacks.isEditor()){this.space=e.type==='keydown';e.preventDefault();}
    if(!this.callbacks.isEditor()||e.target.isContentEditable||(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)&&!((e.target.id==='occluded'&&/^[ko]$/i.test(e.key))||(e.target.id==='object-occluded'&&/^o$/i.test(e.key))))||document.querySelector('dialog[open]'))return;
    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();if(!e.repeat)this.approve();return;}
@@ -829,6 +842,7 @@
    }
    // Cycling classes with [ and ] avoids reaching for the number row.
    if(e.key==='['||e.key===']'){e.preventDefault();this.cycleClass(e.key===']'?1:-1);return;}
+   if(e.ctrlKey||e.metaKey||e.altKey)return;
    if(e.key.toLowerCase()==='v')this.setMode('select');
    if(e.key.toLowerCase()==='r'&&this.project?.task!=='classify')this.setMode('draw');
    if(e.key.toLowerCase()==='a')this.callbacks.navigate(-1);
@@ -855,6 +869,7 @@
    this.saving=operation;this.status();return operation;
   }
   async settleEdits(){
+   if(this.accepting)await this.accepting;
    do{
     if(this.confirming)await this.confirming;
     const saved=await this.save();
@@ -874,7 +889,7 @@
      const name=this.name,source=this.data;
      if(this.pose){this.callbacks.toast('请先完成骨点，或按 K 跳过未知点，再保存审核。');return false;}
      if(this.pending.length&&!this.closePendingContour())return false;
-     if(!this.data.shapes.length&&this.project.task!=='classify'&&!confirm('当前图片没有标注。确认作为无目标的负样本保存并审核？'))return false;
+     if(this.proposal&&!this.data.shapes.length&&!Object.values(this.data.flags||{}).some(v=>v===true)){this.callbacks.toast('AI 建议尚未接纳，请先点击“接纳候选并微调”，检查后再保存审核。');return false;}
      await this.save(true);
      const confirmed=this.name===name&&this.data===source&&!this.dirty&&this.data.checked;
      if(confirmed)this.callbacks.toast('已保存并审核，可用于训练。');return confirmed;
@@ -892,8 +907,37 @@
    }).catch(e=>this.callbacks.toast(e.message)).finally(()=>{if(this.approving===operation)this.approving=null;this.status();});
    this.approving=operation;this.status();return operation;
   }
-  candidate(){$('#candidate-info').textContent=this.proposal?this.proposal.annotation.shapes.length+' 个候选图形，以橙色虚线显示。接纳后仍需人工微调。':'当前图片尚无候选';$('#accept-candidate').disabled=!this.proposal;}
-  async accept(){if(!this.proposal)return;try{await this.save();await this.callbacks.rpc('accept',{name:this.name});await this.open(this.name);this.callbacks.toast('候选已接纳为草稿，请微调后审核。');}catch(e){this.callbacks.toast(e.message);}}
+  candidate(){
+   const count=this.proposal?.annotation?.shapes?.length||0,flags=Object.entries(this.proposal?.annotation?.flags||{}).filter(([,v])=>v===true).map(([k])=>k);
+   $('#candidate-count').textContent=this.proposal?String(count||flags.length):'0';
+   $('#candidate-info').textContent=this.proposal?(flags.length?'AI 建议类别：'+flags.join('、')+'。接纳后可修改。':count+' 个候选图形，以橙色虚线显示。先接纳，再拖动微调并保存审核。'):'当前图片尚无待接纳候选';
+   $('#accept-candidate').disabled=!this.proposal||!!this.accepting;
+   if(this.proposal){const section=document.querySelector('.candidate-section');if(section)section.open=true;}
+  }
+  accept(){
+   if(this.accepting)return this.accepting;
+   if(!this.proposal)return Promise.resolve(false);
+   const name=this.name,root=this.project?.root;
+   let operation;
+   operation=Promise.resolve().then(async()=>{
+    try{
+     if(this.pose||this.pending.length){this.callbacks.toast('请先完成当前标注，再接纳 AI 候选。');return false;}
+     await this.save();
+     if(this.name!==name||this.project?.root!==root)return false;
+     const label=await this.callbacks.rpc('accept',{name});
+     if(this.name!==name||this.project?.root!==root)return false;
+     // open(name) intentionally reuses the currently displayed image; apply the
+     // authoritative RPC response here instead of relying on that short circuit.
+     if(!label?.annotation)throw new Error('接纳结果读取失败，请重新打开图片。');
+     this.data=clone(label.annotation);this.data.shapes??=[];this.data.flags??={};
+     this.baseHash=label.base_hash;this.proposal=label.proposal;this.dirty=false;this.selected=-1;this.selectedMany=[];this.history=[];this.future=[];
+     this.setMode('select',false);this.list();this.render();this.status();this.hint();this.candidate();this.callbacks.onSave?.();
+     this.callbacks.toast('AI 候选已接纳，可以拖动微调，检查后保存审核。');return true;
+    }catch(e){this.callbacks.toast(e.message);return false;}
+   }).finally(()=>{if(this.accepting===operation)this.accepting=null;this.candidate();});
+   this.accepting=operation;this.candidate();return operation;
+  }
+
  }
  document.addEventListener('keyup',e=>{if(e.code==='Space'&&window.editor)window.editor.space=false;});
  window.AnnotationEditor=AnnotationEditor;

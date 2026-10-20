@@ -28,6 +28,14 @@ module.exports=async({win,app,backend,request,ready,root})=>{
   await ev("openImage('img_10.png')");await ev("$('#image-filter').value='pending';loadImages()");await click('#save-annotation');
   await wait(()=>ev("editor.name==='img_11.png'&&!editor.approving"));
   check('pending filter advances from the saved position after current item disappears',await ev("editor.name==='img_11.png'"));
+  check('saved image stays in the filmstrip even when pending filter excludes it',await ev("!!$('#filmstrip').querySelector('[data-name=\"img_10.png\"]')"));
+  await ev('editor.canvas.focus();void 0');key('A');await wait(()=>ev("editor.name==='img_10.png'&&!editor.opening"));
+  check('A returns to just-saved image without changing the dataset filter',await ev("$('#image-filter').value==='pending'&&editor.data.checked"));
+  await ev("editor.data.description='回看修正';editor.changed();void 0");await click('#save-annotation');await wait(()=>ev("editor.name==='img_11.png'&&!editor.approving"));
+  check('resaving a reviewed image returns to the same pending successor',JSON.parse(fs.readFileSync(path.join(project,'annotations','img_10.json'))).description==='回看修正');
+  await click('#editor-prev');await wait(()=>ev("editor.name==='img_10.png'&&!editor.opening"));await click('#editor-next');await wait(()=>ev("editor.name==='img_11.png'&&!editor.opening"));
+  check('filmstrip arrows support saved-image backward and forward navigation',await ev("$('#image-filter').value==='pending'"));
+
   await ev("$('#image-filter').value='all';paging.page=0;loadImages()");await ev("openImage('img_23.png')");await click('#save-annotation');
   await wait(()=>ev("editor.name==='img_24.png'&&!editor.approving"));
   check('save advances across dataset pagination',await ev('paging.page===1'));
@@ -45,13 +53,20 @@ module.exports=async({win,app,backend,request,ready,root})=>{
   await request('save_annotation',{name:record.frames[0].name,annotation,base_hash:null,checked:false});
   await request('start_tracking',{id:record.id,name:record.frames[0].name,mode:'direct'});
   await wait(async()=>!['running','idle'].includes((await request('tracking_status')).status));await pause(200);
-  const queue=await request('queue_tracking_review',{id:record.id});assert.ok(queue.names.length>=4);
+  let queue;await wait(async()=>{try{queue=await request('queue_tracking_review',{id:record.id});return true;}catch(error){if(error.message.includes('视频任务正在运行'))return false;throw error;}});assert.ok(queue.names.length>=4);
   await ev('api.state().then(update)');await ev('window.videoTracking.refresh()');await ev("go('video-review')");await click('#review-gallery .review-open');
   await wait(()=>ev(`editor.name===${JSON.stringify(queue.names[0])}&&!editor.opening`));
   // The first entry may involve an ordinary route mount, outside the sampling scope.
   await ev('window.__blank=0;void 0');await click('#save-annotation');
   await wait(()=>ev(`editor.name===${JSON.stringify(queue.names[1])}&&!editor.approving`));
   check('video review Save advances to the original next frame after queue refresh',await ev('window.__blank===0'));
+  check('confirmed video frame remains available in the filmstrip',await ev(`!!$('#filmstrip').querySelector('[data-name="${queue.names[0]}"]')`));
+  await ev('editor.canvas.focus();void 0');key('A');await wait(()=>ev(`editor.name===${JSON.stringify(queue.names[0])}&&!editor.opening`));
+  check('A reopens the last confirmed video review frame',await ev("page==='editor'&&!!editor.image"));
+  check('reopened confirmed frame retains its reviewed marker',await ev(`$('#filmstrip').querySelector('[data-name="${queue.names[0]}"] .film-status').textContent==='✓ 已审核'`));
+  await ev("editor.data.description='视频回看修正';editor.changed();void 0");await click('#save-annotation');await wait(()=>ev(`editor.name===${JSON.stringify(queue.names[1])}&&!editor.approving`));
+  const revised=await request('load_annotation',{name:queue.names[0]});check('confirmed video frame can be edited and saved again',revised.annotation.description==='视频回看修正');
+
   for(let i=0;i<25;i++)key('S');await wait(()=>ev(`editor.name===${JSON.stringify(queue.names[2])}&&!editor.approving`));
   check('rapid video-review Save burst advances one frame without skipping the next task',await ev('window.__blank===0'));
   await ev('window.__failAccept=true;void 0');await click('#save-annotation');await wait(()=>ev('!editor.approving&&!editor.confirming'));
@@ -60,11 +75,11 @@ module.exports=async({win,app,backend,request,ready,root})=>{
   await ev("window.__reviewOpenLog=[];window.__reviewBaseOpen=editor.open.bind(editor);editor.open=async name=>{window.__reviewOpenLog.push(name);return window.__reviewBaseOpen(name)};void 0");
   const remaining=(await request('video_sequences')).find(r=>r.id===record.id).review_frames.filter(n=>!queue.names.slice(0,3).includes(n));
   const last=remaining.at(-1);if(remaining.length>1)await request('remove_tracking_drafts',{names:remaining.slice(0,-1)});
-  await ev('window.videoTracking.refresh()');await ev("go('video-review')");await click('#review-gallery .review-open');await wait(()=>ev(`editor.name===${JSON.stringify(last)}&&!editor.opening`));
+  await ev('window.videoTracking.refresh()');await ev("go('video-review')");await wait(async()=>{await ev('window.videoTracking.refresh()');return ev("$('#review-total').textContent.startsWith('1 张')");});await click('#review-gallery .review-open');await wait(()=>ev(`editor.name===${JSON.stringify(last)}&&!editor.opening`));
   await ev('window.__blank=0;void 0');await click('#save-annotation');await wait(()=>ev('!editor.approving&&!editor.confirming'));
   check('final video review keeps its confirmed image and clearly reports completion',await ev(`editor.name===${JSON.stringify(last)}&&!!editor.image&&$('#canvas-review-count').textContent.includes('全部审核完成')&&window.__blank===0`));
   await screenshot('review-complete.png');await ev('window.__sampling=false;void 0');
- }catch(error){report.errors.push(error.stack);try{report.debug=await ev("({page,name:editor.name,toast:$('#toast').textContent,opening:!!editor.opening,requested:editor.requestedName,opens:window.__reviewOpenLog,tiles:[...document.querySelectorAll('#review-gallery .review-open')].map(n=>n.textContent)})");await screenshot('failure.png');}catch{}}
+ }catch(error){report.errors.push(error.stack);try{report.debug=await ev("({page,name:editor.name,toast:$('#toast').textContent,opening:!!editor.opening,requested:editor.requestedName,opens:window.__reviewOpenLog,root:state.project?.root,total:$('#review-total').textContent,tiles:[...document.querySelectorAll('#review-gallery .review-open')].map(n=>n.textContent)})");await screenshot('failure.png');}catch{}}
  fs.writeFileSync(path.join(folder,'report.json'),JSON.stringify(report,null,2));
  try{await request('prepare_exit');}catch{}if(backend()?.exitCode===null)backend().kill();app.exit(report.errors.length?1:0);
 };

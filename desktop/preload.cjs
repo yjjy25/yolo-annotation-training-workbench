@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('workbench',{
   choose:kind=>ipcRenderer.invoke('desktop:choose',kind),
   defaults:()=>ipcRenderer.invoke('desktop:defaults'),
   asset:(name,width)=>ipcRenderer.invoke('desktop:asset',name,width),
+  recycleAsset:(root,relative,width)=>ipcRenderer.invoke('desktop:recycle-asset',root,relative,width),
   poseReference:options=>ipcRenderer.invoke('desktop:pose-reference',options),
   models:()=>ipcRenderer.invoke('desktop:models'),
   results:kind=>ipcRenderer.invoke('desktop:results',kind),
