@@ -22,7 +22,7 @@ def ignore(directory,names):
     return [n for n in names if n in excluded or n.startswith('__editable__') or n.endswith(('.pyc','.egg-link'))]
 
 def source_ignore(directory,names):
-    return ignore(directory,names)+[n for n in names if n in {'node_modules','runs','dist','build','.venv','.runtime'}]
+    return ignore(directory,names)+[n for n in names if n in {'node_modules','runs','dist','build','.venv','.runtime'} or n.endswith('.egg-info')]
 
 def linux_copy(source,destination,filter_function=ignore):
     """Hardlink immutable build inputs on one volume, avoiding WSL metadata churn."""
@@ -83,7 +83,7 @@ def stage(platform):
         (target/'安装桌面入口.sh').chmod(0o755)
     # Portable data always stays outside the program resources and is not archived.
     (target/'portable.flag').write_text('portable data beside executable\n',encoding='utf-8')
-    shutil.copy2(ROOT/'文档/安装后使用.md',target/'使用说明.md')
+    shutil.copy2(ROOT/'文档/v0.6_安装说明.md',target/'使用说明.md')
     shutil.copy2(ROOT/'X-AnyLabeling/LICENSE',target/'SOURCE-LICENSE-GPL3.txt')
     data_home='程序旁的“工作台数据”' if platform=='windows' else '~/.config/AnnotationTrainingWorkbench（DEB 安装）'
     (target/'源码与许可说明.txt').write_text('本包包含 Electron 界面源码与 X-AnyLabeling 扩展源码。\n界面源码位于 resources/app，Python 源码位于 resources/workbench/X-AnyLabeling。\n第三方库许可随运行时一同保留。训练权重另遵循对应提供方的许可。\n用户项目、配置和日志保存位置：'+data_home+'。\n',encoding='utf-8')

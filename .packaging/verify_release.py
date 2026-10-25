@@ -28,7 +28,7 @@ def source_files():
             files['resources/app/'+p.name] = p
     excluded = {'.git','__pycache__','.pytest_cache','.ruff_cache','node_modules','runs','dist','build','.venv','.runtime'}
     for base, dirs, names in os.walk(ROOT/'X-AnyLabeling'):
-        dirs[:] = [d for d in dirs if d not in excluded]
+        dirs[:] = [d for d in dirs if d not in excluded and not d.endswith('.egg-info')]
         for name in names:
             p = Path(base)/name
             if not name.endswith(('.pyc','.egg-link')) and not name.startswith('__editable__'):
@@ -36,7 +36,7 @@ def source_files():
     files['resources/workbench/.runtime/launcher.pyw'] = ROOT/'.runtime/launcher.pyw'
     for p in (ROOT/'.runtime/fonts').iterdir():
         if p.is_file(): files['resources/workbench/.runtime/fonts/'+p.name] = p
-    files['使用说明.md'] = ROOT/'文档/安装后使用.md'
+    files['使用说明.md'] = ROOT/'文档/v0.6_安装说明.md'
     files['SOURCE-LICENSE-GPL3.txt'] = ROOT/'X-AnyLabeling/LICENSE'
     return files
 
