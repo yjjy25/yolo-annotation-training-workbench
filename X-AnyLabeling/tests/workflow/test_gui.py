@@ -8,6 +8,21 @@ import anylabeling.config as config
 from .test_project import make_project
 
 
+def test_workbench_ignores_canvas_events_after_attributes_are_cleared():
+    from anylabeling.views.workflow.workbench import Workbench
+
+    # Model the late events observed during QApplication teardown: the Qt
+    # object is alive, but its Python-owned view reference has been cleared.
+    controller = Workbench.__new__(Workbench)
+    QtCore.QObject.__init__(controller)
+    canvas = W.QWidget()
+    canvas.installEventFilter(controller)
+    for kind in (QtCore.QEvent.Type.Hide, QtCore.QEvent.Type.DeferredDelete):
+        assert controller.eventFilter(canvas, QtCore.QEvent(kind)) is False
+    canvas.hide()
+    canvas.removeEventFilter(controller)
+
+
 def test_full_window_preserves_actions_and_pose_roundtrip(tmp_path, monkeypatch):
     app = W.QApplication.instance() or W.QApplication([])
     config.current_config_file = "{}"
