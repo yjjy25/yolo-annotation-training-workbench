@@ -23,6 +23,8 @@ class DesktopController(QtCore.QObject):
         self.validation_buffer=""
         from .export_job import ExportJob
         self.export_job=ExportJob(self)
+        from .model_design_job import ModelDesignJob
+        self.model_design_job=ModelDesignJob(self)
         self.video_job=None
         self.video_payload=None
         self.video_kind="import"
@@ -37,7 +39,34 @@ class DesktopController(QtCore.QObject):
         return self.workflow.project
 
     def call(self,method,args):
+        if method=="model_design_catalog":
+            from anylabeling.services.workflow.model_design.core import catalog
+            return catalog()
+        if method=="model_design_revisions":
+            root=self.project().root/"model_designs/revisions"
+            return [{"id": p.parent.name} for p in sorted(root.glob("rev_*/report.json"),key=lambda p:p.stat().st_mtime,reverse=True)][:100]
+        if method=="model_design_read":
+            import re
+            from anylabeling.services.workflow.project import read_json, digest
+            revision=args.get("revision", "")
+            if not isinstance(revision,str) or not re.fullmatch(r"rev_[a-f0-9]{32}",revision):
+                raise ValueError("无效的设计修订。")
+            folder=self.project().root/"model_designs/revisions"/revision
+            report=read_json(folder/"report.json")
+            if report.get("model_sha256")!=digest(folder/"model.yaml"):
+                raise ValueError("设计配置已被修改，请重新检查。")
+            report["model_path"]=str(folder/"model.yaml")
+            return report
+        if method=="model_design_start":
+            self.ensure_switchable()
+            return self.model_design_job.start(self.project(),args)
+        if method=="model_design_status":
+            return self.model_design_job.status(self.project())
+        if method=="model_design_stop":
+            self.model_design_job.stop()
+            return True
         if method=="prepare_exit":
+            self.model_design_job.stop()
             self.export_job.stop()
             self.stop_video()
             if self.video_job and not self.video_job.waitForFinished(2000):
@@ -479,6 +508,12 @@ class DesktopController(QtCore.QObject):
         if optimizer not in {"SGD","Adam","AdamW","NAdam","RAdam","RMSProp","auto"}:
             raise ValueError("优化器无效。")
         options["optimizer"]=optimizer
+        design_report=None
+        if Path(model).suffix.lower() in {".yaml", ".yml"}:
+            if project.data["task"]!="detect":
+                raise ValueError("设计模型当前仅支持目标检测项目。")
+            from anylabeling.services.workflow.model_design.core import checked_configuration
+            design_report=checked_configuration(model,project.root,len(project.data["classes"]),options["imgsz"])
         dataset=project.build_dataset(args)
         snapshot=dataset if dataset.is_dir() else dataset.parent
         frozen_images=json.loads((snapshot/"manifest.json").read_text(encoding="utf-8"))["images"]
@@ -489,6 +524,19 @@ class DesktopController(QtCore.QObject):
         options.update(model=model,data=str(dataset),project=str(project.root/"runs"),name=name,device=device,lr0=lr,amp=bool(args.get("amp",False)),plots=True,cache=False,save=True,val=True)
         if project.data["task"]=="pose" and not project.data["template"].get("pairs"):
             options.update(fliplr=0.,flipud=0.)
+        if design_report:
+            import shutil
+            snapshot_dir=run/"design_snapshot"
+            snapshot_dir.mkdir(parents=True)
+            for filename in ("model.yaml","graph.json","report.json"):
+                shutil.copy2(Path(model).with_name(filename),snapshot_dir/filename)
+            from anylabeling.services.workflow.project import digest
+            if digest(snapshot_dir/"model.yaml")!=design_report["model_sha256"]:
+                shutil.rmtree(run)
+                raise ValueError("设计文件在冻结期间发生变化，请重新检查。")
+            source_snapshot=Path(model).parent/"sources"
+            if source_snapshot.is_dir():shutil.copytree(source_snapshot,snapshot_dir/"sources")
+            options.update(model=str(snapshot_dir/"model.yaml"),exist_ok=True,seed=design_report["design"]["seed"],deterministic=True,pretrained=False)
         payload=project.root/"runs"/(name+".json")
         write_json(payload,{"version":1,"action":"train","args":options,"paths":{"weights_directory":str(project.root/"models")},"options":{"auto_install_packages":False}})
         self.training={"status":"starting","logs":[],"run":str(run),"project":str(project.root),"epochs":options["epochs"],"dataset_counts":dataset_counts,"dataset":str(snapshot),"started_at":time.time()}

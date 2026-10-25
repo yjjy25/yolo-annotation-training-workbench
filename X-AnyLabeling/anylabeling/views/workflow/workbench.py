@@ -608,6 +608,10 @@ class Workbench(QtCore.QObject):
         self.update_point_hint()
 
     def eventFilter(self, obj, event):
+        # Qt can still deliver canvas teardown events after Python has cleared
+        # this controller's attributes while collecting the window graph.
+        if getattr(self, "view", None) is None:
+            return False
         if obj is self.view.canvas and self.pose_state == "points":
             if self.pose_image != self.view.image_path:
                 self.cancel_pose()

@@ -33,7 +33,8 @@ def test_snapshot_respects_reviews_splits_and_preserves_originals(tmp_path, task
     assert len(manifest["images"]) == 3  # Draft excluded.
     # splits.json now keeps the requested settings next to the frozen assignment.
     splits = read_json(project.root / "splits.json")
-    assert set(splits) == {"settings", "assignments"}
+    assert set(splits) == {"settings", "assignments", "grouping"}
+    assert splits["grouping"]["version"] == 1
     assignments = splits["assignments"]
     assert len(assignments) == 3
     data = read_json(project.annotation(project.images[3]))

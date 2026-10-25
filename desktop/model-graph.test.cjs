@@ -1,0 +1,22 @@
+const assert=require('node:assert/strict');
+const {layout,edges,relatives,routes}=require('./model-graph.js');
+const nodes=[{section:'backbone',from:-1},{section:'backbone',from:-1},{section:'fusion',from:[-1,0]},{section:'fusion',from:-1},{section:'output',from:[2,3]}];
+const plan=layout(nodes);
+assert.deepEqual(plan.groups,['backbone','fusion','output']);
+assert.equal(plan.counts.backbone,2);
+assert.ok(plan.points[0].x<plan.points[2].x&&plan.points[2].x<plan.points[4].x);
+assert.ok(plan.points[0].y<plan.points[1].y);
+assert.deepEqual(edges(nodes).filter(e=>e.target===2).map(e=>e.source),[1,0]);
+assert.deepEqual(edges(nodes).filter(e=>e.target===4).map(e=>e.source),[2,3]);
+const path=relatives(nodes.length,plan.links,2);
+assert.deepEqual([...path.upstream].sort(),[0,1]);assert.deepEqual([...path.downstream].sort(),[3,4]);
+assert.ok(plan.points.every(p=>p.x>=0&&p.x+300<plan.width&&p.y+106<plan.height));
+assert.deepEqual(layout([{from:-1}]).groups,['network'],'old revisions are labelled unpartitioned instead of guessing their roles');
+assert.throws(()=>edges([{from:-1},{from:99}]),/非法输入来源/,'invalid references must be rejected instead of disappearing');
+assert.throws(()=>edges([{from:-1},{from:1}]),/非法输入来源/);
+assert.throws(()=>edges([{from:-1},{from:-3}]),/非法输入来源/);
+console.log('Model graph: declared regions, real fan-in, path tracing, readable card bounds and legacy fallback passed.');
+
+const routed=routes(plan).filter(r=>r.lane!==undefined);
+assert.equal(new Set(routed.map(r=>r.lane)).size,routed.length,'different nonlocal edges must not share a vertical trunk');
+assert.ok(routed.every(r=>Number.isFinite(r.labelX)&&Number.isFinite(r.labelY)));

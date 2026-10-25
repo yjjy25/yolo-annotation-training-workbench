@@ -285,6 +285,10 @@ def configure_weights_directory(weights_directory: str) -> None:
 def run_train(payload: dict) -> None:
     train_args = dict(payload["args"])
     allowed = {
+        "seed",
+        "pretrained",
+        "deterministic",
+        "exist_ok",
         "data",
         "model",
         "project",
@@ -363,11 +367,13 @@ def run_train(payload: dict) -> None:
     try:
         sys.stdout = log_stream
         sys.stderr = log_stream
-        model = YOLO(train_args.pop("model"))
+        from anylabeling.services.workflow.model_design.training import load_training_model
+        model = load_training_model(train_args.pop("model"))
         attach_training_progress(model)
         train_args["verbose"] = False
         train_args["show"] = False
-        model.train(**train_args)
+        from anylabeling.services.workflow.model_design.training import train_model
+        train_model(model, train_args)
     finally:
         log_stream.flush()
         sys.stdout, sys.stderr = original_stdout, original_stderr

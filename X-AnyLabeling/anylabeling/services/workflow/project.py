@@ -4,7 +4,6 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import random
 import shutil
 import tempfile
 import time
@@ -247,97 +246,38 @@ class Project:
         return {"mode": mode, "ratio": ratio, "count": count, "seed": seed}
 
     def split_preview(self, options=None):
-        """How many reviewed images would land in each split, without freezing anything."""
-        settings = self.split_settings(options)
-        eligible, groups = [], {}
-        for image in self.images:
-            label = self.annotation(image)
-            if label.exists() and read_json(label).get("checked") is True:
-                eligible.append(image)
-                groups.setdefault(digest(image), []).append(image)
-        hashes = sorted(groups)
-        if len(hashes) < 2:
-            return {"settings": settings, "images": len(eligible), "unique": len(hashes), "train": len(eligible), "val": 0, "ready": False}
-        if settings["mode"] == "count":
-            validate = min(len(hashes) - 1, int(settings["count"]))
-        else:
-            validate = min(len(hashes) - 1, max(1, round(len(hashes) * settings["ratio"] / 100)))
-        validate = max(1, validate)
-        shuffled = list(hashes)
-        random.Random(settings["seed"]).shuffle(shuffled)
-        validation = set(shuffled[:validate])
-        split_path = self.root / "splits.json"
-        if split_path.exists():
-            frozen = read_json(split_path)
-            assignments = frozen.get("assignments", frozen)
-            if assignments and (not options or settings == frozen.get("settings")):
-                validation = {h for h in hashes if assignments.get(h, "train") == "val"}
-        return {
-            "settings": settings,
-            "images": len(eligible),
-            "unique": len(hashes),
-            "train": sum(len(groups[h]) for h in hashes if h not in validation),
-            "val": sum(len(groups[h]) for h in validation if h in groups),
-            "ready": bool(validation) and len(validation) < len(hashes),
-        }
+        """Preview the same whole-source plan used by snapshot construction."""
+        from .dataset_split import create_plan
+        return create_plan(self, options)["preview"]
 
     def build_dataset(self, options=None):
-        """Freeze reviewed data, retaining existing splits and grouping byte-identical images.
+        """Freeze reviewed data with indivisible source/verified duplicate groups.
 
-        ``options`` may carry ``mode`` ('ratio' or 'count'), ``ratio`` (percent),
-        ``count`` (exact validation images) and ``seed``. When the caller asks for
-        a different split than the one already frozen, the assignment is rebuilt
-        from scratch; otherwise new images are appended to the training set so
-        repeated runs stay comparable.
+        Existing assignments remain fixed unless split settings change. Conflicts
+        discovered in an old split block publication instead of silently leaking
+        video frames into both partitions. Source images and labels are untouched.
         """
         from anylabeling.views.labeling.label_converter import LabelConverter
-        eligible = []
-        for image in self.images:
-            label = self.annotation(image)
-            if label.exists() and read_json(label).get("checked") is True:
-                eligible.append(image)
-        if len(eligible) < 2:
-            raise ValueError("至少需要两张人工审核通过的图片，用于建立训练集和验证集。")
-        groups = {}
-        for image in eligible:
-            groups.setdefault(digest(image), []).append(image)
-        if len(groups) < 2:
-            raise ValueError("至少需要两张内容不同的已审核图片。")
-        split_path = self.root / "splits.json"
-        splits = read_json(split_path) if split_path.exists() else {}
-        settings = self.split_settings(options)
-        seen = read_json(split_path) if split_path.exists() else {}
-        previous = seen.get("settings") if isinstance(seen.get("settings"), dict) else {}
-        assignments = seen.get("assignments") if isinstance(seen.get("assignments"), dict) else seen
-        recompute = bool(assignments) and bool(options) and settings != previous
-        if not assignments or recompute:
-            hashes = sorted(groups)
-            random.Random(settings["seed"]).shuffle(hashes)
-            if settings["mode"] == "count":
-                count = max(1, min(len(hashes) - 1, int(settings["count"])))
-            else:
-                count = max(1, round(len(hashes) * settings["ratio"] / 100))
-                count = min(count, len(hashes) - 1)
-            assignments = {h: ("val" if i < count else "train") for i, h in enumerate(hashes)}
-        else:
-            assignments = dict(assignments)
-            assignments.update({h: "train" for h in groups if h not in assignments})
-        if not all(any(assignments[h] == part for h in groups) for part in ("train", "val")):
-            raise ValueError("当前已审核数据未覆盖固定训练集和验证集，请补审对应图片，或调整划分比例/数量。")
-        write_json(split_path, {"settings": settings, "assignments": assignments})
-        splits = assignments
+        from .dataset_split import create_plan
+        plan = create_plan(self, options)
+        preview = plan["preview"]
+        if not preview["ready"]:
+            raise ValueError(preview["reason"])
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S_") + uuid.uuid4().hex[:6]
         target = self.root / "datasets" / stamp
         target.mkdir(parents=True)
         task = self.data["task"]
         converter = LabelConverter(pose_cfg_file=str(self.root / "templates" / "pose.yaml")) if task == "pose" else LabelConverter()
         converter.classes = self.data["classes"]
+        group_by_image = {name: group for group in plan["groups"] for name in group["members"]}
         manifest = []
-        for content_hash, images in groups.items():
-            part = splits[content_hash]
-            for image in images:
+        try:
+            for name, record in plan["records"].items():
+                image = self.root / "images" / name
                 label = self.annotation(image)
-                data = read_json(label)
+                content_hash = record["fingerprint"]["sha256"]
+                part = plan["assignments"][content_hash]
+                data = record["annotation"]
                 if task == "classify":
                     names = [c for c, enabled in data.get("flags", {}).items() if enabled and c in self.data["classes"]]
                     if len(names) != 1:
@@ -348,24 +288,43 @@ class Project:
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(image, destination)
                 archived = target / "annotations" / label.name
-                write_json(archived, data)
+                archived.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(label, archived)
+                # Validate copied bytes against the plan, catching edits made
+                # between preview/planning and snapshot creation.
+                if digest(destination) != content_hash or digest(archived) != record["label_sha256"]:
+                    raise ValueError(f"{name}：图片或标注在划分期间发生变化，请重新生成数据集。")
+                out = None
                 if task != "classify":
                     out = target / "labels" / part / (image.stem + ".txt")
                     out.parent.mkdir(parents=True, exist_ok=True)
                     self.validate_annotation(data, image.name)
-                    self.prepare_yolo_annotations(label, out, task, image.name, converter)
-                manifest.append({"image": image.name, "image_sha256": content_hash, "label_sha256": digest(label), "split": part})
-        config = {"path": target.as_posix(), "train": "images/train", "val": "images/val", "names": dict(enumerate(self.data["classes"]))}
-        if task == "pose":
-            template = self.data["template"]
-            config["kpt_shape"] = [len(template["points"]), 3]
-            flip = list(range(len(template["points"])))
-            for a, b in template.get("pairs", []):
-                flip[a], flip[b] = b, a
-            # Training UI disables flipping when pairs are absent.
-            config["flip_idx"] = flip if template.get("pairs") else []
-        (target / "data.yaml").write_text(yaml.safe_dump(config, allow_unicode=True, sort_keys=False), encoding="utf-8")
-        write_json(target / "manifest.json", {"project": self.data, "images": manifest, "source_grouping": "exact-content only; video/scene grouping requires user-supplied split"})
+                    self.prepare_yolo_annotations(archived, out, task, image.name, converter)
+                group = group_by_image[name]
+                manifest.append({"image": image.name, "image_sha256": content_hash,
+                                 "label_sha256": record["label_sha256"],
+                                 "archived_label_sha256": digest(archived),
+                                 "exported_label_sha256": digest(out) if out else None,
+                                 "exported_label": out.relative_to(target).as_posix() if out else None,
+                                 "split": part, "group_id": group["id"], "group_reasons": group["reasons"]})
+            config = {"path": target.as_posix(), "train": "images/train", "val": "images/val", "names": dict(enumerate(self.data["classes"]))}
+            if task == "pose":
+                template = self.data["template"]
+                config["kpt_shape"] = [len(template["points"]), 3]
+                flip = list(range(len(template["points"])))
+                for a, b in template.get("pairs", []):
+                    flip[a], flip[b] = b, a
+                config["flip_idx"] = flip if template.get("pairs") else []
+            (target / "data.yaml").write_text(yaml.safe_dump(config, allow_unicode=True, sort_keys=False), encoding="utf-8")
+            write_json(target / "manifest.json", {"project": self.data, "images": manifest,
+                                                 "source_grouping": plan["metadata"]})
+            # A failed conversion must not change the last usable frozen split.
+            write_json(self.root / "splits.json", {"settings": preview["settings"],
+                                                   "assignments": plan["assignments"],
+                                                   "grouping": plan["metadata"]})
+        except Exception:
+            shutil.rmtree(target)
+            raise
         return target if task == "classify" else target / "data.yaml"
 
     def task_shapes(self):
