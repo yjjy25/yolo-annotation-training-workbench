@@ -446,10 +446,12 @@ def run_training_worker_command(args):
 
         from ultralytics import YOLO
 
-        model = YOLO(train_args.pop("model"))
+        from anylabeling.services.workflow.model_design.training import load_training_model
+        model = load_training_model(train_args.pop("model"))
         train_args["verbose"] = False
         train_args["show"] = False
-        model.train(**train_args)
+        from anylabeling.services.workflow.model_design.training import train_model
+        train_model(model, train_args)
     except Exception as e:
         log_stream.flush()
         emit_training_worker_event(
