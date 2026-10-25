@@ -44,7 +44,12 @@ let newShape='rectangle';
 let state={ready:false,project:null},page='data',items=[],paging={page:0,pages:1},galleryKey='',projectKey='',modelKey='',modelsContext='',modelGeneration=0,newTask='detect',projectsHome='',newRootEdited=false,toastTimer,searchTimer,loadSequence=0,refreshPending=null,trainingPending=false;
 // Explicit Save confirms review; internal navigation saves remain drafts.
 function toast(message){$('#toast').textContent=message;$('#toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').hidden=true,6000);}
-async function rpc(method,args={}){const result=await api.rpc(method,args);if(!result.ok)throw new Error(result.error);return result.result;}
+async function rpc(method,args={}){
+ const result=await api.rpc(method,args);if(!result.ok)throw new Error(result.error);
+ // These writes can change membership or provenance without changing counts.
+ if(['create_project','open_project','import_project','save_annotation','import_images','remove_image','remove_images','restore_recycle','accept_tracking_frame','start_training'].includes(method))invalidateSplitPreview();
+ return result.result;
+}
 window.editor=new AnnotationEditor({rpc,toast,isEditor:()=>page==='editor'||(page==='video'&&!$('#tracking-editor-host').hidden),navigate:step=>navigate(step),prepareNext:()=>window.canvasNavigation?.prepareNext()??window.videoTracking?.prepareSaveNext?.()??prepareDatasetNext(),onSave:()=>{galleryKey='';if(window.videoTracking?.ownsTimeline())return;clearTimeout(saveRefreshTimer);saveRefreshTimer=setTimeout(()=>loadImages().catch(e=>toast(e.message)),160);}});
 const editor=window.editor;
 let saveRefreshTimer;
@@ -69,7 +74,7 @@ async function showPage(next){
   await window.videoTracking?.mount(next);
   document.querySelectorAll('main>section').forEach(section=>section.hidden=section.id!=='page-'+page);
   document.querySelectorAll('.nav-item[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===(review?'review':page)));
-  $('#crumb-page').textContent=review?'人工审查 · 待确认图片':{data:'数据与标注',video:'视频追踪标注','video-review':'视频待微调',editor:'标注画布',models:'模型预标注',train:'模型训练',validate:'模型验证',export:'模型转换与量化'}[page];
+  $('#crumb-page').textContent=review?'人工审查 · 待确认图片':{design:'模型结构设计',data:'数据与标注',video:'视频追踪标注','video-review':'视频待微调',editor:'标注画布',models:'模型预标注',train:'模型训练',validate:'模型验证',export:'模型转换与量化'}[page];
   if(page==='video'||page==='video-review')await window.videoTracking?.refresh();
   // The image list drives the canvas. On a fresh start it is still empty, so an
   // entry into the canvas used to leave a blank picture with an empty label list.
@@ -80,7 +85,7 @@ async function showPage(next){
   if(page==='export')refreshExportSource();
   if(page==='train')refreshTrainingResults();
   if(page==='data')await loadImages();
-  if(page==='data'||page==='train')refreshSplitPreview();
+  if(page==='data'||page==='train')refreshSplitPreview(true);
   if(page==='validate'){await refreshModels();await refreshValidationPlots();}
  }catch(e){toast(e.message);}
 }
@@ -266,7 +271,7 @@ function update(next){
  $('#mode').value=project?.mode||'manual';document.querySelectorAll('[data-flow]').forEach(b=>b.classList.toggle('selected',b.dataset.flow===(project?.mode||'manual')));
  $('#training-ready').textContent=project?c.checked+' / '+c.total+' 张已审核': '请先建立项目并标注图片';$('#training-task').textContent=project?taskNames[project.task]+' · '+project.classes.join('、'):'';
  // The split belongs to the dataset, so it previews on the data page too.
- if(project&&(page==='train'||page==='data'))refreshSplitPreview();
+ if(page==='train'||page==='data')refreshSplitPreview();
  const info=next.training_info&&next.training_info.project===project?.root?next.training_info:{status:'idle',logs:[]};const running=['starting','training'].includes(info.status);
  state.validationInfo=next.validation_info;state.trainingInfo=info;
  $('#training-status').textContent=trainingPending?'准备已审核数据快照…':({idle:'尚未开始',starting:'正在准备环境',training:'训练中',completed:'训练完成',failed:'训练失败',stopped:'已停止'}[info.status]||info.status);
@@ -283,7 +288,7 @@ function update(next){
   logs.textContent=lines.join('\n')||'训练开始后在这里显示真实日志。';
   if(auto||atEnd)logs.scrollTop=logs.scrollHeight;
  }
- $('#train-start').disabled=trainingPending||running||!next.ready||!project||c.checked<2;$('#train-start').title=c.checked<2?'请先标注并审核至少两张内容不同的图片。':'';$('#train-stop').disabled=!running;
+ updateTrainingStart();$('#train-stop').disabled=!running;
  renderValidation(next.validation_info,project);
  renderExport(next);
  $('#predict-start').disabled=!!next.predicting||!!next.native_training||running||!next.ready||!project;$('#predict-stop').disabled=!next.predicting;$('#predict-status').textContent=next.predicting?'正在生成全部图片候选…':({idle:'尚未生成候选',completed:'候选已生成，请进入人工审查',failed:'预标注失败，请查看日志中的原因',stopped:'已停止，已生成的候选仍保留'}[next.prediction_status]||'尚未生成候选');$('#predict-log').textContent=next.prediction_log||'';
@@ -587,22 +592,47 @@ $('#add-class').onclick=()=>{if(!state.project)return toast('请先建立项目�
 $('#auto-approve').checked=true;
 $('#text-cancel').onclick=()=>$('#text-dialog').close();
 $('#text-form').onsubmit=async e=>{e.preventDefault();try{const name=$('#text-value').value.trim();await rpc('add_class',{name});await api.state().then(update);editor.activeClass=name;$('#active-class').value=name;$('#text-dialog').close();toast('已追加类别：'+name);}catch(error){$('#text-error').textContent=error.message;}};
-$('#image-filter').onchange=()=>{paging.page=0;loadImages();};$('#image-search').oninput=()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>{paging.page=0;loadImages();},250);};$('#refresh-images').onclick=loadImages;
+$('#image-filter').onchange=()=>{paging.page=0;loadImages();};$('#image-search').oninput=()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>{paging.page=0;loadImages();},250);};$('#refresh-images').onclick=()=>{loadImages();refreshSplitPreview(true);};
 $('#prev-page').onclick=()=>{paging.page--;loadImages();};$('#next-page').onclick=()=>{paging.page++;loadImages();};$('#page-size').onchange=()=>{paging.page=0;loadImages();};$('#editor-prev').onclick=()=>navigate(-1);$('#editor-next').onclick=()=>navigate(1);
 for(const id of ['#split-mode','#split-ratio','#split-count','#split-seed'])$(id).onchange=()=>refreshSplitPreview();
+$('#training-split-refresh').onclick=()=>refreshSplitPreview(true);
 function splitArgs(){return {split_mode:$('#split-mode').value,split_ratio:Number($('#split-ratio').value),split_count:Number($('#split-count').value),split_seed:Number($('#split-seed').value)};}
 // The state publisher runs about once a second, so this must stay idempotent: an
 // earlier "newest call wins" guard rejected every write because each update
 // bumped the counter while the previous response was still in flight.
 let splitPending=null;
-function splitPreviewKey(){return JSON.stringify([state.project?.root,state.project?.counts,splitArgs()]);}
+let splitRevision=0,splitResult=null;
+function invalidateSplitPreview(){splitRevision++;splitKey='';splitResult=null;}
+function splitPreviewKey(){return JSON.stringify([state.project?.root,state.project?.counts,splitArgs(),splitRevision]);}
+function updateTrainingStart(){
+ const project=state.project,info=state.training_info&&state.training_info.project===project?.root?state.training_info:{};
+ const pending=splitKey!==splitPreviewKey()||!splitResult;
+ const reason=!project?'请先打开项目。':!state.ready?'等待本地引擎就绪。':pending?'正在检查分组与划分，请稍候。':!splitResult.ready?(splitResult.reason||'至少需要 2 个独立组，且训练与验证之间不能有同组冲突。'):'';
+ $('#train-start').disabled=trainingPending||['starting','training'].includes(info.status)||!!reason;
+ $('#train-start').title=reason;
+}
 function showSplitPreview(text,title=''){
  $('#split-summary').textContent=text;$('#split-summary').title=title;
  $('#training-split-summary').textContent='当前数据预计划分 · '+text;
  $('#training-split-summary').title=title;
+ for(const id of ['#split-details','#training-split-details']){$(id).textContent=title;$(id).hidden=!title;}
+ updateTrainingStart();
 }
-async function refreshSplitPreview(){
- if(!state.project){splitKey='';showSplitPreview('尚未打开项目');return;}
+function describeSplitPreview(preview){
+ const summary=[`训练集 ${preview.train} 张`,`验证集 ${preview.val} 张`,'测试集 0 张',`已审核 ${preview.images} 张`];
+ if(Number.isInteger(preview.groups))summary.push(`独立组 ${preview.groups} 组`);
+ const details=[];
+ if(!preview.ready)details.push(preview.reason||'至少需要 2 个独立组，且训练与验证之间不能有同组冲突。');
+ if(Number.isInteger(preview.video_groups))details.push(`同源视频组 ${preview.video_groups} 组`);
+ if(Number.isInteger(preview.similar_groups))details.push(`已识别近重复组 ${preview.similar_groups} 组`);
+ if(Number.isInteger(preview.target_val))details.push(`验证集目标 ${preview.target_val} 张，实际 ${preview.val} 张${preview.target_val!==preview.val?'；按组划分或沿用冻结划分，实际数量可能偏离目标':''}`);
+ for(const warning of preview.warnings||[])if(warning&&!details.includes(warning))details.push(warning);
+ details.push('按当前规则分组，同源视频和已识别的重复组不跨训练/验证集；近重复检查不能覆盖所有相似场景。','未划分独立测试集；用于论文结论的测试数据需另行准备，避免参与调参。');
+ return {text:(preview.ready?'':'无法开始训练 · ')+summary.join(' · '),details:details.map(text=>text.replace(/[。；]+$/,'')).join('。')+'。'};
+}
+async function refreshSplitPreview(force=false){
+ if(force===true)invalidateSplitPreview();
+ if(!state.project){splitKey='';splitResult=null;showSplitPreview('尚未打开项目');return;}
  if(!state.ready)return;
  const key=splitPreviewKey();
  if(key===splitKey)return;
@@ -612,9 +642,9 @@ async function refreshSplitPreview(){
  try{
   const preview=await rpc('split_preview',splitArgs());
   if(!state.project||splitPreviewKey()!==key)return;
-  splitKey=key;
-  showSplitPreview(`训练集 ${preview.train} 张 · 验证集 ${preview.val} 张 · 测试集 0 张（已审核 ${preview.images} 张）`,preview.ready?'未划分独立测试集；可在验证页选择自选文件夹测试。':'至少需要 2 张内容不同的已审核图片才能训练。未划分独立测试集。');
- }catch(error){if(splitPreviewKey()===key)showSplitPreview(error.message);}
+  splitKey=key;splitResult=preview;
+  const description=describeSplitPreview(preview);showSplitPreview(description.text,description.details);
+ }catch(error){if(splitPreviewKey()===key)showSplitPreview('划分检查失败',error.message+'；点击“重新检查划分”或数据页的“刷新”后重试。');}
  })();
  splitPending={key,promise:operation};
  try{await operation;}finally{if(splitPending?.promise===operation)splitPending=null;}
@@ -704,12 +734,13 @@ const HELP={
  ]},
  split:{title:'训练 / 验证划分',body:[
   ['为什么要划分','模型只有在没见过的图片上才知道自己行不行。所以已审核的图片会被分成两部分：大部分用来“学”（训练集），留一小部分不参与学习，只用来打分（验证集）。'],
-  ['划分方式','按比例：验证集占已审核图片的百分比，例如 20%。按数量：直接指定验证集有几张，例如 1 张。数据很少时用“按数量”更好控制。'],
-  ['验证集比例 %','填 20 表示每 5 张已审核图片里留 1 张做验证。范围 5–50%。验证集太少分数会飘，太多则模型学得不够。'],
-  ['验证集数量','按数量方式下验证集固定几张。只有 6 张已审核图片时，留 1 张验证、5 张训练是合理的。'],
-  ['划分随机种子','同样的种子给同样的划分。想换一批图片做验证就改这个数字；不改则多次训练的结果可以互相比较。'],
-  ['什么时候冻结','点“开始训练”时才写入 splits.json 并固定下来。之后新审核通过的图片会自动进入训练集，不会打乱已有的验证集。'],
-  ['提示','验证集里不要出现和训练集几乎一样的图片（例如同一张图的增强副本），否则验证分数会虚高。']
+  ['划分方式','按比例或按数量设置验证集目标。同源视频的帧、完全重复和已识别的近重复图片按整组划分，因此实际数量可能偏离目标；至少需要 2 个独立组。'],
+  ['验证集比例 %','填 20 表示目标为已审核图片的 20%，范围 5–50%。实际比例由分组大小及冻结划分决定；很多相似帧并不代表很多独立样本。'],
+  ['验证集目标数量','设置希望用于验证的图片数。系统会保留整组，不会为凑足数量将同一视频或重复组拆入训练和验证两侧。'],
+  ['划分随机种子','相同数据、分组规则和设置给出可重复划分。改比例、数量或种子会重新划分；重新划分后要在同一划分上重跑基线和改进模型，才能直接比较。'],
+  ['什么时候冻结','点“开始训练”时才写入 splits.json 并固定下来。之后补审图片继承同组归属，新独立组默认进入训练集。同源视频和重复组不会拆分。'],
+  ['旧划分冲突','若旧划分或新增图片把同一个组连接到了训练与验证两侧，会显示冲突并阻止训练。调整划分比例、数量或种子后重新划分，并重新运行基线实验。'],
+  ['近重复检查的范围','系统会检查已知视频来源及保守的图像相似线索，但不能识别所有同一对象、场景、裁剪或增强副本。论文实验仍需按采集来源审查数据，另留不参与调参的独立测试集。']
  ]},
  train:{title:'训练参数',body:[
   ['运行设备 device','cpu 用处理器，慢但不挑环境；0 用第一块 NVIDIA 显卡，快。写 0 就必须有可用的 CUDA 驱动。'],

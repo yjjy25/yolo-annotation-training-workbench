@@ -20,7 +20,7 @@ let current={event:'state',project:null,training:'idle',predicting:false,embedde
 let nativeDiagnostics=null;
 const diagnosticWaiters=new Map();
 const requests=new Map();
-const rpcMethods=new Set(['create_project','open_project','load_annotation','save_annotation','add_class','mode','start_training','stop_training','predict','stop_predict','accept','start_export','stop_export','start_validation','stop_validation','model_classes','model_info','split_preview','remove_image','remove_images','export_project','import_project','project_storage','image_removal_plan','cleanup_project','restore_recycle','artifact_inventory','archive_artifacts','import_video','video_status','stop_video','video_sequences','create_tracking','start_tracking','tracking_status','advance_tracking','import_images','tracking_preview','ack_tracking_preview','seek_tracking','accept_tracking_frame','queue_tracking_review','remove_tracking_drafts']);
+const rpcMethods=new Set(['model_design_catalog','model_design_revisions','model_design_read','model_design_start','model_design_status','model_design_stop','create_project','open_project','load_annotation','save_annotation','add_class','mode','start_training','stop_training','predict','stop_predict','accept','start_export','stop_export','start_validation','stop_validation','model_classes','model_info','split_preview','remove_image','remove_images','export_project','import_project','project_storage','image_removal_plan','cleanup_project','restore_recycle','artifact_inventory','archive_artifacts','import_video','video_status','stop_video','video_sequences','create_tracking','start_tracking','tracking_status','advance_tracking','import_images','tracking_preview','ack_tracking_preview','seek_tracking','accept_tracking_frame','queue_tracking_review','remove_tracking_drafts']);
 function request(method,args={}){
   if(!ready)return Promise.reject(new Error(current.error||'本地引擎正在启动，请稍候。'));
   const request_id=require('node:crypto').randomUUID();
@@ -372,6 +372,8 @@ ipcMain.handle('desktop:close-ready',(_event,payload)=>{
 let qaStarted=false;
 async function runQA(){
   if(qaStarted)return;qaStarted=true;
+  if(process.env.XAL_QA_GRAPH)return require('./model-graph-qa.cjs')({win,app,backend:()=>backend,request,ready:()=>ready});
+  if(process.env.XAL_QA_DESIGN)return require('./model-designer-qa.cjs')({win,app,backend:()=>backend,request,ready:()=>ready});
   if(process.env.XAL_QA_STORAGE)return require('./project-storage-qa.cjs')({win,app,backend:()=>backend,request,ready:()=>ready});
   if(process.env.XAL_QA_ARTIFACTS)return require('./artifact-manager-qa.cjs')({win,app,backend:()=>backend,request,ready:()=>ready});
   if(process.env.XAL_QA_AIPREVIEW)return require('./ai-preview-qa.cjs')({win,app,backend:()=>backend,request,ready:()=>ready});
