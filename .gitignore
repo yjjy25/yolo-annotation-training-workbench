@@ -33,3 +33,6 @@ dist/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Public runtime source URLs and checksums used to rebuild v0.6 installers
+!.packaging/base-runtime-v0.5.2.json
