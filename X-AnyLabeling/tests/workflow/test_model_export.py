@@ -2,7 +2,7 @@ from pathlib import Path
 import json
 import pytest
 from anylabeling.services.workflow.model_export import options, run, quantize_unicode, inspect_weights
-from anylabeling.services.workflow.model_export import maixcam_head, check_maixcam
+from anylabeling.services.workflow.model_export import maixcam_family, check_maixcam, maixcam_anchors
 
 
 def payload(tmp_path, **kwargs):
@@ -58,12 +58,15 @@ def test_failure_preserves_original_and_records_failure(tmp_path, monkeypatch):
         raise RuntimeError('invalid checkpoint')
     monkeypatch.setattr(ultralytics, 'YOLO', fail)
     args = payload(tmp_path)
-    with pytest.raises(RuntimeError, match='invalid checkpoint'):
+    # Unloadable checkpoints now raise a readable ValueError that keeps the original reason.
+    with pytest.raises(ValueError, match='invalid checkpoint'):
         run(tmp_path, args)
     assert Path(args['weights']).read_bytes() == b'original weights'
     records = list((tmp_path / 'exports').glob('*/export.json'))
     assert len(records) == 1
-    assert json.loads(records[0].read_text(encoding='utf-8'))['status'] == 'failed'
+    record = json.loads(records[0].read_text(encoding='utf-8'))
+    assert record['status'] == 'failed'
+    assert 'Ultralytics' in record['error']
 
 
 def test_unicode_shape_inference_and_restoration(tmp_path):
@@ -104,18 +107,49 @@ def test_maixcam_defaults_and_generic_compatibility(tmp_path):
     assert config['target'] == 'generic' and config['imgsz'] == 640
 
 
-def test_maixcam_head_rejects_wrong_task_and_missing_branch():
-    from types import SimpleNamespace as NS
-    head = type('Detect', (), dict(reg_max=1, nl=3, nc=3, one2one_cv2=[], one2one_cv3=[]))()
-    model = NS(task='detect', model=NS(model=[None] * 23 + [head]))
-    assert maixcam_head(model) == 3
-    head.one2one_cv2 = None
-    with pytest.raises(ValueError, match='one2one'):
-        maixcam_head(model)
-    head.one2one_cv2 = []
-    model.task = 'segment'
-    with pytest.raises(ValueError, match='Detect'):
-        maixcam_head(model)
+def _head(name='Detect', **fields):
+    values = dict(nc=3, nl=3, reg_max=16, one2one_cv2=None, one2one_cv3=None)
+    values.update(fields)
+    return type(name, (), values)()
+
+
+def _model(modules, head, task='detect'):
+    def layer(module):
+        return type('Layer', (), {'type': f'ultralytics.nn.modules.{module}'})()
+    return type('Model', (), {'task': task, 'model': type('Block', (), {'model': [layer(m) for m in modules] + [head]})()})()
+
+
+@pytest.mark.parametrize('modules,fields,family,label', [
+    (['Conv', 'C2f', 'SPPF'], {}, 'yolov8', 'YOLOv8'),
+    (['C3k2', 'C3k', 'C2PSA'], {}, 'yolo11', 'YOLO11'),
+    (['Conv', 'C3', 'SPPF'], {}, 'yolov5u', 'YOLOv5u'),
+    (['C3k2', 'C2PSA'], dict(reg_max=1, one2one_cv2=[], one2one_cv3=[]), 'yolo26', 'YOLO26'),
+])
+def test_maixcam_families_are_read_from_real_modules(modules, fields, family, label):
+    profile = maixcam_family(_model(modules, _head(**fields)))
+    assert (profile['family'], profile['label'], profile['classes']) == (family, label, 3)
+    assert profile['head'] == len(modules)
+
+
+@pytest.mark.parametrize('modules,head_name,task,match', [
+    (['Conv', 'C2f'], 'Segment', 'detect', '目标检测'),          # segmentation / pose / OBB heads
+    (['Conv', 'C2f'], 'Pose', 'detect', '目标检测'),
+    (['Conv', 'C2f'], 'Detect', 'segment', '目标检测'),
+    (['Conv', 'SPPF'], 'Detect', 'detect', '无法识别'),          # unknown / old YOLOv5 style network
+    (['Conv', 'C2f'], 'Detect', 'detect', '检测头'),             # unsupported reg_max
+    (['C3k2'], 'Detect', 'detect', '一对一'),                    # YOLO26 after head fusion: no one2one
+])
+def test_maixcam_rejects_unsupported_models(modules, head_name, task, match):
+    fields = {'检测头': dict(reg_max=8), '一对一': dict(reg_max=1)}.get(match, {})
+    model = _model(modules, _head(head_name, **fields), task=task)
+    with pytest.raises(ValueError, match=match):
+        maixcam_family(model)
+
+
+def test_maixcam_family_rejects_two_level_heads():
+    model = _model(['Conv', 'C2f'], _head(nl=2))
+    with pytest.raises(ValueError, match='三个检测尺度'):
+        maixcam_family(model)
 
 
 def test_maixcam_exact_profile_and_shape_validation():
@@ -138,7 +172,8 @@ def test_maixcam_exact_profile_and_shape_validation():
     for item in inputs[1:]:
         graph.graph.initializer.append(onnx.numpy_helper.from_array(np.zeros([d.dim_value for d in item.type.tensor_type.shape.dim], dtype=np.float32), item.name))
     del graph.graph.input[1:]
-    assert len(check_maixcam(graph, [224, 320], 3)['nodes']) == 6
+    record = check_maixcam(graph, [224, 320], 3)
+    assert record['profile'] == 'yolo26' and len(record['nodes']) == 6
     with pytest.raises(ValueError, match='输入形状'):
         check_maixcam(graph, [320, 224], 3)
     with pytest.raises(ValueError, match='检测分支'):
@@ -146,3 +181,36 @@ def test_maixcam_exact_profile_and_shape_validation():
     graph.graph.node[-1].output[0] = 'ordinary-cv3-output'
     with pytest.raises(ValueError, match='检测分支'):
         check_maixcam(graph, [224, 320], 3)
+
+
+def _detect_graph(classes=3, count=None, transposed=False, outputs=1):
+    import onnx
+    from onnx import helper, TensorProto
+    anchors = maixcam_anchors([224, 320]) if count is None else count
+    value = lambda name, shape: helper.make_tensor_value_info(name, TensorProto.FLOAT, shape)
+    shape = [1, anchors, 4 + classes] if transposed else [1, 4 + classes, anchors]
+    names = [f'output{i}' for i in range(outputs)]
+    nodes = [helper.make_node('Identity', ['images'], [name]) for name in names]
+    return helper.make_model(helper.make_graph(nodes, 'detect', [value('images', [1, 3, 224, 320])],
+                                               [value(name, shape) for name in names]))
+
+
+def test_maixcam_standard_detect_output_validation():
+    anchors = maixcam_anchors([224, 320])
+    assert anchors == 1470  # 224x320 at strides 8/16/32
+    record = check_maixcam(_detect_graph(), [224, 320], 3, 'yolov8')
+    assert (record['profile'], record['label'], record['status']) == ('yolov8', 'YOLOv8', 'passed')
+    assert record['output_shape'] == [1, 7, anchors] and list(record['nodes']) == ['output0']
+    with pytest.raises(ValueError, match='转置'):
+        check_maixcam(_detect_graph(transposed=True), [224, 320], 3, 'yolov5u')
+    with pytest.raises(ValueError, match='通道'):
+        check_maixcam(_detect_graph(classes=4), [224, 320], 3, 'yolo11')
+    with pytest.raises(ValueError, match='锚点'):
+        check_maixcam(_detect_graph(count=anchors - 70), [224, 320], 3, 'yolov8')
+    with pytest.raises(ValueError, match='单个输出'):
+        check_maixcam(_detect_graph(outputs=2), [224, 320], 3, 'yolov8')
+    # nms=True produces [1, 300, 6] for any class count; MaixHub cannot use that.
+    with pytest.raises(ValueError, match='NMS'):
+        check_maixcam(_detect_graph(classes=2, count=300, transposed=True), [224, 320], 80, 'yolov8')
+    with pytest.raises(ValueError, match='输入形状'):
+        check_maixcam(_detect_graph(), [320, 224], 3, 'yolov8')

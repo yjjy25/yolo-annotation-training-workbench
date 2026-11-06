@@ -27,12 +27,13 @@
    models=records;const keys=new Set(records.map(r=>r.key));for(const key of selected.models)if(!keys.has(key))selected.models.delete(key);
    host.replaceChildren();
    if(!records.length){const p=document.createElement('p');p.className='muted';p.textContent='暂无本项目模型。训练完成后或将 PT 权重放入项目 models 文件夹后，可在这里管理。';host.append(p);}
-   for(const item of records){const row=document.createElement('div');row.className='managed-model-row';const details=document.createElement('div'),name=document.createElement('strong'),path=document.createElement('small');name.textContent=item.label;path.textContent=item.path;details.title=item.detail;details.append(name,path);row.append(checkbox('models',item.key,item.label),details,deleteButton('models',item.key));host.append(row);}
+   for(const item of records){const row=document.createElement('div');row.className='managed-model-row';const details=document.createElement('div'),name=document.createElement('strong'),path=document.createElement('small');name.textContent=item.label;path.textContent=item.path;details.title=item.detail;details.append(name,path);const convert=document.createElement('button');convert.type='button';convert.textContent='转换';convert.disabled=!item.weights;convert.title=item.weights?'把 '+item.label+' 带到“模型转换与量化”':'没有可转换的权重';convert.onclick=()=>window.convertWeights?.(item.weights);row.append(checkbox('models',item.key,item.label),details,convert,deleteButton('models',item.key));host.append(row);}
    sync();
   }catch(error){toast(error.message);}
  }
  function cleanOptions(removed){
   const normal=p=>p.replaceAll('\\','/').toLowerCase();
+  window.forgetExportWeights?.(removed.map(item=>item.weights).filter(Boolean));
   for(const id of ['train-model','predict-model','validate-model','export-model'])for(const option of [...$('#'+id).options])if(removed.some(item=>normal(option.value)===normal(item.path)||normal(option.value).startsWith(normal(item.path)+'/')))option.remove();
  }
  async function remove(kind,keys=[...selected[kind]]){

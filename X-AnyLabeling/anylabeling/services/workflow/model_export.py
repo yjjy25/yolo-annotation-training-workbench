@@ -77,38 +77,97 @@ def options(args):
                 calibration=[str(p) for p in calibration], calibration_limit=limit)
 
 
-def maixcam_head(model):
-    """Only offer the YOLO26 Detect profile verified with MaixHub's public route."""
-    layers = model.model.model
+MAIXCAM_FAMILIES = {'yolo26': 'YOLO26', 'yolo11': 'YOLO11', 'yolov8': 'YOLOv8', 'yolov5u': 'YOLOv5u'}
+MAIXCAM_STRIDES = (8, 16, 32)
+
+
+def maixcam_family(model):
+    """Identify which MaixHub-supported Detect family a checkpoint really is.
+
+    MaixHub's online converter accepts YOLOv5u / YOLOv8 / YOLO11 / YOLO26 Detect
+    only. YOLOv5u is Ultralytics' anchor-free YOLOv5 and shares YOLOv8's check and
+    post-processing; the old ``ultralytics/yolov5`` weights do not even load here.
+    The family comes from the actual layers, never the file name, so a renamed
+    checkpoint cannot be uploaded under the wrong profile.
+    """
+    layers = list(model.model.model)
     head = layers[-1]
-    if (model.task != 'detect' or type(head).__name__ != 'Detect' or len(layers) != 24
-            or getattr(head, 'reg_max', None) != 1 or getattr(head, 'nl', None) != 3
-            or getattr(head, 'one2one_cv2', None) is None
-            or getattr(head, 'one2one_cv3', None) is None):
-        raise ValueError('MaixCAM 模式当前仅支持标准 YOLO26 Detect（model.23、三尺度、保留 one2one 权重）。'
-                         '此权重不匹配；其他模型请使用通用模式，或按 Sipeed 文档单独适配。')
-    return int(head.nc)
+    if getattr(model, 'task', '') != 'detect' or type(head).__name__ != 'Detect':
+        raise ValueError('MaixCAM 模式只支持目标检测（Detect）模型；分割、姿态、旋转框和分类请用通用模式，'
+                         '或按 Sipeed 文档手动转换。')
+    if getattr(head, 'nl', None) != 3 or getattr(head, 'reg_max', None) not in {1, 16}:
+        raise ValueError('MaixCAM 模式只支持三个检测尺度的标准 YOLO 检测头（reg_max 为 1 或 16）；'
+                         '此模型的检测头结构不受支持。')
+    modules = {str(getattr(layer, 'type', '')).rsplit('.', 1)[-1] for layer in layers}
+    if getattr(head, 'one2one_cv2', None) is not None and getattr(head, 'one2one_cv3', None) is not None:
+        family = 'yolo26'
+    elif getattr(head, 'reg_max', None) == 1:
+        raise ValueError('这个权重看起来是 YOLO26，但一对一分支已被融合或移除；'
+                         '请使用训练得到的原始 .pt，不要用推理/融合后的模型。')
+    elif 'C3k2' in modules:
+        family = 'yolo11'
+    elif 'C2f' in modules:
+        family = 'yolov8'
+    elif 'C3' in modules:
+        family = 'yolov5u'
+    else:
+        family = ''
+    if not family:
+        raise ValueError('无法识别这个检测模型的家族。MaixHub 网页转换仅接受 YOLOv5u / YOLOv8 / YOLO11 / YOLO26 '
+                         '检测模型；旧版 ultralytics/yolov5 权重不能在此使用，请先换成 Ultralytics 的 YOLOv5u。')
+    return {'family': family, 'label': MAIXCAM_FAMILIES[family], 'classes': int(head.nc),
+            'head': len(layers) - 1, 'strides': list(MAIXCAM_STRIDES)}
 
 
-def check_maixcam(graph, size, classes):
-    """Verify exact tensor names and shapes consumed by the YOLO26 cloud profile."""
+def maixcam_anchors(size):
+    return sum((size[0] // stride) * (size[1] // stride) for stride in MAIXCAM_STRIDES)
+
+
+def check_maixcam(graph, size, classes, family='yolo26', head_index=23):
+    """Verify the ONNX MaixHub's online converter consumes for each family."""
     import onnx
     graph = onnx.shape_inference.infer_shapes(graph)
     shapes = {v.name: [d.dim_value for d in v.type.tensor_type.shape.dim]
               for v in [*graph.graph.input, *graph.graph.value_info, *graph.graph.output]}
     if len(graph.graph.input) != 1 or shapes[graph.graph.input[0].name] != [1, 3, *size]:
         raise ValueError('MaixCAM 输入形状与指定的高、宽不符，请使用 32 的倍数。')
-    convolutions = {name for node in graph.graph.node if node.op_type == 'Conv' for name in node.output}
-    required = {}
-    for branch, channels in ((2, 4), (3, classes)):
-        for scale, stride in enumerate((8, 16, 32)):
-            name = f'/model.23/one2one_cv{branch}.{scale}/one2one_cv{branch}.{scale}.2/Conv_output_0'
-            expected = [1, channels, size[0] // stride, size[1] // stride]
-            if name not in convolutions or shapes.get(name) != expected:
-                raise ValueError(f'MaixHub YOLO26 检测分支不匹配：{name}；预期 {expected}，实际 {shapes.get(name)}。'
-                                 '请检查 Ultralytics 版本及 one2one 分支，不能将普通 ONNX 直接改名。')
-            required[name] = expected
-    return dict(profile='yolo26', nodes=required, input_shape=[1, 3, *size], status='passed')
+    if family == 'yolo26':
+        convolutions = {name for node in graph.graph.node if node.op_type == 'Conv' for name in node.output}
+        required = {}
+        for branch, channels in ((2, 4), (3, classes)):
+            for scale, stride in enumerate(MAIXCAM_STRIDES):
+                name = f'/model.{head_index}/one2one_cv{branch}.{scale}/one2one_cv{branch}.{scale}.2/Conv_output_0'
+                expected = [1, channels, size[0] // stride, size[1] // stride]
+                if name not in convolutions or shapes.get(name) != expected:
+                    raise ValueError(f'MaixHub YOLO26 检测分支不匹配：{name}；预期 {expected}，实际 {shapes.get(name)}。'
+                                     '请检查 Ultralytics 版本及 one2one 分支，不能将普通 ONNX 直接改名。')
+                required[name] = expected
+        return dict(profile=family, label=MAIXCAM_FAMILIES[family], nodes=required,
+                    input_shape=[1, 3, *size], status='passed')
+    # YOLOv5u / YOLOv8 / YOLO11 export one decoded tensor: [1, 4 + 类别数, 锚点数].
+    label = MAIXCAM_FAMILIES.get(family, family)
+    expected = [1, 4 + classes, maixcam_anchors(size)]
+    outputs = [(v.name, shapes.get(v.name)) for v in graph.graph.output]
+    if len(outputs) != 1:
+        raise ValueError(f'MaixHub 的 {label} 检测模型需要单个输出，实际有 {len(outputs)} 个；'
+                         '请使用 nms=False、dynamic=False 导出，不要输出 NMS 后的多路结果。')
+    name, shape = outputs[0]
+    if not shape or len(shape) != 3 or shape[0] != 1:
+        raise ValueError(f'输出形状无法识别：{name} {shape}；应为 [1, {expected[1]}, {expected[2]}]。')
+    if shape == expected:
+        return dict(profile=family, label=label, nodes={name: shape}, input_shape=[1, 3, *size],
+                    output_shape=shape, status='passed')
+    if shape == [1, 300, 6]:
+        raise ValueError('输出是 NMS 后的 [1, 300, 6]，MaixHub 需要未解码的检测输出；'
+                         '请用 nms=False、dynamic=False 重新导出（本页默认就是这样）。')
+    if shape[1] != expected[1] and shape[2] != expected[1]:
+        raise ValueError(f'输出通道不是 4+类别数（{expected[1]}）：{shape}。'
+                         '模型类别数与权重不一致，或导出时检测头被裁剪。')
+    if list(shape[1:]) == list(reversed(expected[1:])):
+        raise ValueError(f'输出是转置布局 {shape}，MaixHub 需要标准布局 {expected}；'
+                         '请用本页或 Ultralytics 默认 ONNX 导出，不要自行转置。')
+    raise ValueError(f'输出锚点数与 {size[0]}×{size[1]} 不符：期望 {expected[2]}，实际 {shape}。'
+                     '请使用 32 的倍数并固定输入尺寸导出。')
 
 
 def sha256(path):
@@ -152,9 +211,11 @@ def export_torchscript(model, kwargs):
 
 def run(root, args):
     config = options(args)
-    folder = Path(root).resolve() / 'exports' / (datetime.now().strftime('%Y%m%d-%H%M%S') + '-' + uuid.uuid4().hex[:8])
+    root = Path(root).resolve()
+    folder = root / 'exports' / (datetime.now().strftime('%Y%m%d-%H%M%S') + '-' + uuid.uuid4().hex[:8])
     folder.mkdir(parents=True, exist_ok=False)
-    record = dict(config, status='running', run=str(folder), source_sha256=sha256(config['weights']))
+    record = dict(config, status='running', run=str(folder), root=str(root),
+                  scope=args.get('scope', 'project'), source_sha256=sha256(config['weights']))
     def save():
         (folder / 'export.json').write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding='utf-8')
     save()
@@ -164,23 +225,34 @@ def run(root, args):
         # Ultralytics writes beside its input: use a private copy for every job.
         source = folder / 'source.pt'
         shutil.copy2(config['weights'], source)
-        model = YOLO(str(source))
-        classes = maixcam_head(model) if config['target'] == 'maixcam' else None
+        try:
+            model = YOLO(str(source))
+        except Exception as error:
+            raise ValueError(
+                f'无法按 Ultralytics YOLO 权重加载这个 .pt：{error}。'
+                '请确认文件本身是 YOLO 训练得到的 PT 权重；YOLOv5 或非 Ultralytics 框架的权重需要先转换成 '
+                'Ultralytics 格式，不能直接在此转换。') from error
+        profile = maixcam_family(model) if config['target'] == 'maixcam' else None
+        classes = profile['classes'] if profile else None
         print(f"转换 {model.task} → {config['format']} / {config['precision']}，尺寸 {config['imgsz']}", flush=True)
         kwargs = dict(format=config['format'], imgsz=config['imgsz'], device='cpu', batch=1,
                       half=False, dynamic=False)
         if config['format'] == 'onnx':
             kwargs.update(opset=17, simplify=False)
         if config['target'] == 'maixcam':
-            # Explicit False is essential: current Ultralytics disables one2one for nms=None.
-            kwargs.update(simplify=True, nms=False)
-            print('MaixCAM / Pro：准备 YOLO26 one2one ONNX；云端量化需另行提交 MaixHub。', flush=True)
+            kwargs.update(simplify=True)
+            if profile['family'] == 'yolo26':
+                # Explicit False is essential: current Ultralytics disables one2one for nms=None.
+                kwargs.update(nms=False)
+            record.update(maixcam_family=profile['family'], maixcam_family_label=profile['label'])
+            print(f"MaixCAM / Pro：{profile['label']} 检测 → ONNX FP32（{classes} 类）；"
+                  '云端量化需另行提交 MaixHub。', flush=True)
         record['export_args'] = kwargs
         save()
         exported = Path(export_torchscript(model, kwargs) if config['format'] == 'torchscript' else model.export(**kwargs)).resolve()
         if not exported.is_file() or folder not in exported.parents:
             raise ValueError('导出器未生成预期的结果文件。')
-        output = folder / (('maixcam-yolo26' if config['target'] == 'maixcam' else 'model') + '-' + config['precision'] + exported.suffix)
+        output = folder / (((('maixcam-' + profile['family']) if profile else 'model')) + '-' + config['precision'] + exported.suffix)
         if config['precision'] == 'fp16':
             import onnx
             from onnxruntime.transformers.float16 import convert_float_to_float16
@@ -227,7 +299,8 @@ def run(root, args):
             import onnx
             onnx.checker.check_model(str(output))
             if config['target'] == 'maixcam':
-                record['maixcam_check'] = check_maixcam(onnx.load(str(output)), config['imgsz'], classes)
+                record['maixcam_check'] = check_maixcam(onnx.load(str(output)), config['imgsz'], classes,
+                                                       profile['family'], profile['head'])
             if config['precision'] != 'fp16':
                 import numpy as np
                 import onnxruntime as ort
@@ -252,19 +325,22 @@ def run(root, args):
             names = model.names
             labels = [names[i] for i in range(classes)]
             (folder / 'labels.txt').write_text('\n'.join(labels) + '\n', encoding='utf-8')
+            family_check = record.get('maixcam_check') or {}
             (folder / 'MaixCAM使用说明.md').write_text(
                 '# MaixCAM / MaixCAM Pro\n\n'
-                f'上传 `{output.name}` 至 https://maixhub.com/toolbox/convert/maixcam ，选择 YOLO26 和实际板型。\n\n'
+                f'上传 `{output.name}` 至 https://maixhub.com/toolbox/convert/maixcam ，'
+                f'选择 **{profile["label"]}**、目标检测和实际板型。\n\n'
                 f'输入：高 {size[0]} × 宽 {size[1]}，RGB / 255、按比例缩放补边；类别顺序见 labels.txt。\n\n'
                 '准备 20～100 张有代表性的真实图片 ZIP（≤100 MB、无需标注），在 MaixHub 完成 INT8 量化。'
                 '下载并将 .mud 与 .cvimodel 一起部署。\n\n'
-                '本地已检查 ONNX、六个 one2one 节点及尺寸、CPU 推理；未进行云端编译和板端精度验证。'
-                '最终 ONNX 输出可为 [1,300,6]，MaixHub 使用内部检测节点。\n\n'
+                f'本地已识别模型家族为 {profile["label"]}，并检查 ONNX、输入尺寸、导出结构与 CPU 推理；'
+                '未进行云端编译和板端精度验证。MaixHub 页面上的模型类型必须与此一致，否则转换会失败。\n\n'
                 '此模式面向 MaixCAM / Pro，MaixCAM2 请按官方对应文档重新适配。\n'
                 '官方说明：https://wiki.sipeed.com/maixpy/doc/zh/ai_model_converter/online_converter.html\n', encoding='utf-8')
         record.update(status='completed', output=str(output), bytes=output.stat().st_size,
                       sha256=sha256(output), task=model.task, names=model.names,
-                      note=('MaixHub YOLO26 六节点与 CPU 检查通过；尚需云端量化与板端验证。' if config['target'] == 'maixcam' else
+                      note=(f'{profile["label"]} 检测导出与检查通过（{family_check.get("profile", profile["family"])}）；'
+                            '尚需 MaixHub 云端量化与板端验证。' if config['target'] == 'maixcam' else
                             'INT8 为静态 QDQ 量化；请在目标设备上重新验证精度。FP16 需目标推理引擎支持半精度算子。'))
         save()
         source.unlink()  # Only remove our own temporary weight copy after success.

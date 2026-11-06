@@ -8,6 +8,18 @@ from PyQt6 import QtCore
 from anylabeling.services.workflow.model_export import options
 
 
+def output_root(project):
+    """Where a conversion's ``exports/`` folder lives.
+
+    A project owns its conversions. Without a project the page still converts a
+    user's own ``.pt``; those runs belong to the workbench profile instead of a
+    dataset, so they cannot be mistaken for project artifacts.
+    """
+    if project is not None:
+        return Path(project.root), 'project'
+    return Path(os.environ.get('XAL_WORKBENCH_HOME') or Path.home()), 'workspace'
+
+
 class ExportJob(QtCore.QObject):
     def __init__(self, controller):
         super().__init__(controller)
@@ -28,12 +40,13 @@ class ExportJob(QtCore.QObject):
         if dialog and dialog.export_manager.is_exporting:
             raise ValueError('高级工具仍在导出，请先完成或停止。')
         config = options(args)
-        root = owner.project().root
+        root, scope = output_root(owner.workflow.project)
         payload = root / 'exports' / ('request-' + uuid.uuid4().hex + '.json')
         payload.parent.mkdir(parents=True, exist_ok=True)
-        payload.write_text(json.dumps({**args, 'root': str(root)}, ensure_ascii=False), encoding='utf-8')
+        payload.write_text(json.dumps({**args, 'root': str(root), 'scope': scope}, ensure_ascii=False), encoding='utf-8')
         self.payload = payload
-        self.info = {'status': 'starting', 'logs': [], 'project': str(root), 'format': config['format'], 'precision': config['precision'], 'target': config['target']}
+        self.info = {'status': 'starting', 'logs': [], 'project': str(root), 'scope': scope,
+                     'format': config['format'], 'precision': config['precision'], 'target': config['target']}
         self.buffer = ''
         process = self.process = QtCore.QProcess(self)
         process.setProcessChannelMode(QtCore.QProcess.ProcessChannelMode.MergedChannels)
@@ -68,6 +81,11 @@ class ExportJob(QtCore.QObject):
                 try:
                     record = json.loads(line[len('EXPORT_RESULT:'):])
                     self.info.update(output=record['output'], run=record['run'], bytes=record['bytes'])
+                    # Which MaixHub profile this ONNX was exported for, so the page
+                    # can say which model type to pick in the cloud converter.
+                    if record.get('maixcam_family'):
+                        self.info['family'] = record['maixcam_family']
+                        self.info['family_label'] = record.get('maixcam_family_label', record['maixcam_family'])
                 except (ValueError, KeyError):
                     self.info['logs'].append('结果记录无法读取。')
             elif line.strip():

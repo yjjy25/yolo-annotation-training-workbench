@@ -84,7 +84,7 @@ async function showPage(next){
   if(page==='editor'){editor.fit();if(!editor.name&&items[0]){await editor.open(items[0].name);renderFilmstrip();}}
   if(page==='train'||page==='models'||page==='export')await refreshModels();
  if(page==='models'||page==='train')await window.artifactManager?.refreshModels();
-  if(page==='export')refreshExportSource();
+  if(page==='export'){refreshExportSource();renderExport(state);}
   if(page==='train')refreshTrainingResults();
   if(page==='data')await loadImages();
   if(page==='data'||page==='train')refreshSplitPreview(true);
@@ -290,7 +290,7 @@ function update(next){
   logs.textContent=lines.join('\n')||'训练开始后在这里显示真实日志。';
   if(auto||atEnd)logs.scrollTop=logs.scrollHeight;
  }
- updateTrainingStart();$('#train-stop').disabled=!running;
+ updateTrainingStart();$('#train-stop').disabled=!running;syncTrainingConvert();
  renderValidation(next.validation_info,project);
  renderExport(next);
  $('#predict-start').disabled=!!next.predicting||!!next.native_training||running||!next.ready||!project;$('#predict-stop').disabled=!next.predicting;$('#predict-status').textContent=next.predicting?'正在生成全部图片候选…':({idle:'尚未生成候选',completed:'候选已生成，请进入人工审查',failed:'预标注失败，请查看日志中的原因',stopped:'已停止，已生成的候选仍保留'}[next.prediction_status]||'尚未生成候选');$('#predict-log').textContent=next.prediction_log||'';
@@ -301,7 +301,7 @@ function update(next){
  if(running&&!trainingPoll){trainingPoll=setInterval(()=>refreshTrainingResults(),2500);}
  if(!running&&trainingPoll){clearInterval(trainingPoll);trainingPoll=null;refreshTrainingResults();}
  if(previous.predicting&&!next.predicting){galleryKey='';loadImages();if(editor.name&&!editor.dirty){const name=editor.name,root=state.project?.root;rpc('load_annotation',{name}).then(label=>{if(editor.name!==name||state.project?.root!==root||editor.dirty)return;editor.proposal=label.proposal;editor.candidate();editor.render();}).catch(e=>toast(e.message));}}
- if(previous.training_info?.status!==info.status&&info.status==='completed'){modelKey='';refreshModels();refreshTrainingResults(true);toast('训练完成，已在下方显示训练结果图。');}
+ if(previous.training_info?.status!==info.status&&info.status==='completed'){modelKey='';refreshModels();refreshTrainingResults(true);toast('训练完成，已显示训练结果；可点“转换这个模型”直接导出。');}
  if(previous.training_info?.status!==info.status&&info.status==='failed')refreshTrainingResults();
  if(previous.validation_info?.status!==next.validation_info?.status&&next.validation_info?.status==='completed'){refreshValidationPlots();toast('验证完成，右侧显示评估指标。');}
  window.maixcam?.sync();
@@ -504,14 +504,53 @@ async function showValidationPlots(record){
  }
 }
 
+// Weights picked from disk are the only source that can sit outside this project,
+// so they are remembered here and kept selectable across project switches.
+const localWeightPaths=new Set();
+let trainedRecords=[];
+function shortPath(value){return String(value??'').split(/[\\/]/).filter(Boolean).slice(-3).join('/');}
+// Deleted project weights must leave the conversion dropdown too, even when the
+// user had opened them from the model manager (they are not project run records).
+window.forgetExportWeights=paths=>{for(const path of paths||[])if(path)localWeightPaths.delete(path);};
+// One entry point for "convert this model": the trained-model rows, the training
+// page shortcut and the local picker all land on the conversion page with the
+// weights already selected.
+async function convertWeights(weights){
+ if(!weights){toast('还没有可转换的模型：请先训练，或在转换页选择本地 PT 权重。');return;}
+ const select=$('#export-model');
+ if(!trainedRecords.some(record=>record.weights===weights))localWeightPaths.add(weights);
+ await go('export');
+ if(![...select.options].some(option=>option.value===weights))addOption(select,weights,shortPath(weights)+' · 项目模型');
+ select.value=weights;
+ exportSourceKey='';
+ refreshExportSource();
+ renderExport(state);
+}
+function syncTrainingConvert(){
+ const info=state.trainingInfo||{};
+ const weights=window.ExportScope?.runWeights(trainedRecords,info.status==='completed'?info.run:null);
+ const running=['starting','training'].includes(info.status);
+ $('#training-convert').disabled=!weights||running;
+ $('#training-convert').textContent=info.status==='completed'&&info.run?'转换这个模型':'转换最新模型';
+ $('#training-convert').title=running?'训练进行中，完成后再转换':weights?('把 '+shortPath(weights)+' 带到“模型转换与量化”'):'训练完成后可以转换这次的 best.pt';
+}
+function renderExportModelSelect(records){
+ const select=$('#export-model'),kept=select.value,keptOption=[...select.options].find(o=>o.value===kept&&o.value);
+ select.replaceChildren();
+ for(const record of records)addOption(select,record.weights,(window.ExportScope?.runLabel(record.name)||record.name)+' · 本项目模型');
+ if(keptOption&&localWeightPaths.has(kept)&&!records.some(record=>record.weights===kept))select.add(keptOption);
+ if(kept&&[...select.options].some(o=>o.value===kept))select.value=kept;
+ if(![...select.options].some(o=>o.value)){const prompt=addOption(select,'','请选择本地 PT 权重（.pt）');prompt.disabled=true;}
+}
 async function refreshModels(){
- if(!state.project)return;
+ if(!state.project){trainedRecords=[];renderExportModelSelect([]);renderExport(state);syncTrainingConvert();return;}
  const generation=++modelGeneration,task=state.project?.task||'detect',context=JSON.stringify([state.project?.root,task]);
  const [records,catalog]=await Promise.all([api.models(),rpc('training_model_catalog')]);if(generation!==modelGeneration||context!==JSON.stringify([state.project?.root,state.project?.task||'detect']))return;
+ trainedRecords=records;syncTrainingConvert();
  const sameContext=modelsContext===context;modelsContext=context;
  const suffix={detect:'',segment:'-seg',pose:'-pose',obb:'-obb',classify:'-cls'}[task];
  const key=JSON.stringify([state.project?.root,task,records,catalog]);if(key===modelKey)return;modelKey=key;
- for(const id of ['#train-model','#predict-model']){const select=$(id),previous=sameContext?select.value:'',existing=[...select.options].find(o=>o.value===previous);select.replaceChildren();const customPose=task==='pose'&&state.project.template?.preset!=='coco17';if(id==='#predict-model'&&customPose){const prompt=addOption(select,'','请选择骨点匹配的本地或已训练模型');prompt.disabled=true;}else for(const base of ['yolov8n','yolov8s','yolo11n','yolo11s','yolo26n'])addOption(select,base+suffix+'.pt',base+suffix+(catalog.find(item=>item.name===base+suffix+'.pt')?.local?' · 已缓存，可离线使用':' · 未缓存，需联网下载')+(task==='pose'?' · 人体预训练':''));for(const record of records)addOption(select,record.weights,record.name+' · 本项目模型');if(existing&&previous&&![...select.options].some(o=>o.value===previous))select.add(existing);if([...select.options].some(o=>o.value===previous))select.value=previous;}
+ for(const id of ['#train-model','#predict-model']){const select=$(id),previous=sameContext?select.value:'',existing=[...select.options].find(o=>o.value===previous);select.replaceChildren();const customPose=task==='pose'&&state.project.template?.preset!=='coco17';if(id==='#predict-model'&&customPose){const prompt=addOption(select,'','请选择骨点匹配的本地或已训练模型');prompt.disabled=true;}else for(const base of ['yolov8n','yolov8s','yolo11n','yolo11s','yolo26n'])addOption(select,base+suffix+'.pt',base+suffix+(catalog.find(item=>item.name===base+suffix+'.pt')?.local?' · 已缓存，可离线使用':' · 未缓存，需联网下载')+(task==='pose'?' · 人体预训练':''));for(const record of records)addOption(select,record.weights,(window.ExportScope?.runLabel(record.name)||record.name)+' · 本项目模型');if(existing&&previous&&![...select.options].some(o=>o.value===previous))select.add(existing);if([...select.options].some(o=>o.value===previous))select.value=previous;}
  // Validation compares project models against the frozen split; only this
  // project's own trained weights make sense there.
  const validate=$('#validate-model'),kept=validate.value;
@@ -522,16 +561,18 @@ async function refreshModels(){
   for(const record of records)addOption(validate,record.weights,record.name+' · 本项目模型');
   if(kept&&[...validate.options].some(o=>o.value===kept))validate.value=kept;else validate.value=records[0].weights;
  }
- const exportSelect=$('#export-model'),exportKept=sameContext?exportSelect.value:'',exportOption=[...exportSelect.options].find(o=>o.value===exportKept);
- exportSelect.replaceChildren();
- for(const record of records)addOption(exportSelect,record.weights,record.name+' · 本项目模型');
- if(exportOption&&exportKept&&![...exportSelect.options].some(o=>o.value===exportKept))exportSelect.add(exportOption);
- if(exportKept&&[...exportSelect.options].some(o=>o.value===exportKept))exportSelect.value=exportKept;
- if(!exportSelect.options.length)addOption(exportSelect,'','请选择本地 PT 权重或先训练模型');
+ renderExportModelSelect(records);renderExport(state);
  const list=$('#trained-models');list.replaceChildren();if(!records.length){const p=document.createElement('p');p.className='muted';p.textContent='训练完成后，best.pt 会出现在这里。';list.append(p);}
- for(const record of records){const row=document.createElement('div');row.className='model-row';const name=document.createElement('span');name.textContent=record.name;name.title=record.weights;const use=document.createElement('button');use.textContent='用于预标注';use.onclick=async()=>{$('#predict-model').value=record.weights;await rpc('mode',{mode:'trained'});go('models');};const convert=document.createElement('button');convert.textContent='转换 / 量化';convert.onclick=async()=>{await go('export');$('#export-model').value=record.weights;refreshExportSource();};row.append(name,use,convert);window.artifactManager?.decorateTrained(row,record);list.append(row);}
+ for(const record of records){const row=document.createElement('div');row.className='model-row';const name=document.createElement('span');name.textContent=window.ExportScope?.runLabel(record.name)||record.name;name.title=record.name+' · '+record.weights;const use=document.createElement('button');use.textContent='用于预标注';use.onclick=async()=>{$('#predict-model').value=record.weights;await rpc('mode',{mode:'trained'});go('models');};const convert=document.createElement('button');convert.textContent='转换 / 量化';convert.onclick=()=>convertWeights(record.weights);row.append(name,use,convert);window.artifactManager?.decorateTrained(row,record);list.append(row);}
 }
-async function localWeights(select){const path=await api.choose('weights');if(path){addOption($(select),path,path.split(/[\\/]/).pop()+' · 本地权重');$(select).value=path;}}
+async function localWeights(select){
+ const path=await api.choose('weights');
+ if(!path)return;
+ localWeightPaths.add(path);
+ const element=$(select),existing=[...element.options].find(option=>option.value===path);
+ if(!existing)addOption(element,path,path.split(/[\\/]/).pop()+' · 本地权重');
+ element.value=path;
+}
 function chooseTask(task){newTask=task;newShape=(taskShapes[task]||taskShapes.detect)[0].id;document.querySelectorAll('[data-task]').forEach(b=>b.classList.toggle('selected',b.dataset.task===task));$('#new-task-hint').textContent=taskHints[task];$('#new-pose-fields').hidden=task!=='pose';if(task==='pose'&&['目标','person','dog'].includes($('#new-classes').value))$('#new-classes').value=$('#new-preset').value==='dog'?'dog':'person';renderShapes();}
 function renderShapes(){
  const choices=taskShapes[newTask]||taskShapes.detect,row=$('#shape-picker');
@@ -659,6 +700,10 @@ $('#predict-stop').onclick=()=>rpc('stop_predict').catch(e=>toast(e.message));
 $('#predict-local').onclick=()=>localWeights('#predict-model');$('#train-local').onclick=()=>localWeights('#train-model');$('#validate-local').onclick=()=>localWeights('#validate-model');
 $('#train-initialization').onchange=()=>{const scratch=$('#train-initialization').value==='scratch';$('#train-allow-download').disabled=scratch;$('#train-local').disabled=scratch;};
 $('#refresh-models').onclick=()=>{modelKey='';refreshModels();};$('#open-results').onclick=()=>api.results();
+$('#training-convert').onclick=async()=>{
+ const info=state.trainingInfo||{};
+ await convertWeights(window.ExportScope?.runWeights(trainedRecords,info.status==='completed'?info.run:null));
+};
 $('#training-clear').onclick=()=>{$('#training-log').textContent='（已清空显示，磁盘上的训练日志不受影响。）';};
 $('#training-autoscroll').onchange=()=>{if($('#training-autoscroll').checked){const logs=$('#training-log');logs.scrollTop=logs.scrollHeight;}};
 // Shared by the form and by the toolbar, so validation can also be started
@@ -718,7 +763,7 @@ const HELP={
   ['格式是什么','格式决定模型交给什么软件读取。训练得到的 .pt 是原模型文件；转换格式类似把文档另存成另一种文件类型，不会重新训练模型，也不会自动提高识别能力。'],
   ['ONNX（推荐）','导出 .onnx 文件，多种推理软件支持。第一次使用可先选 ONNX + FP32，确认目标软件支持后，再考虑压缩。'],
   ['TorchScript','导出 .torchscript 文件，主要交给使用 PyTorch 的程序。对接程序明确要求时再选，本页只支持 FP32。'],
-  ['原模型会怎样','原始 PT 权重保留。新模型和转换记录另存到项目 exports 目录。']
+  ['原模型会怎样','原始 PT 权重保留。新模型和转换记录另存到 exports 目录：打开项目时在项目内，没打开项目时在工作台数据目录。']
  ]},
  exportPrecision:{title:'计算精度是什么',body:()=>[
   ['当前模型与转换目标',$('#export-source-info').textContent+'\n'+$('#export-target-info').textContent],
@@ -825,19 +870,26 @@ async function refreshExportSource(){
  try{
   const info=await rpc('model_info',{weights});
   if(generation!==exportSourceGeneration||weights!==$('#export-model').value||root!==state.project?.root)return;
-  label.textContent='当前模型：'+info.format+'（.pt） · '+info.precision+(info.mixed?'（混合存储）':'')+'；这是文件存储精度。';
+  label.textContent='当前模型：'+shortPath(weights)+' · '+info.format+' · '+info.precision+(info.mixed?'（混合存储）':'')+'；这是文件存储精度。';
  }catch(error){if(generation===exportSourceGeneration){exportSourceKey='';label.textContent='当前模型：PT（.pt） · 精度未知；'+error.message;}}
 }
+// A conversion belongs either to the open project or, without one, to the
+// workbench profile. Both are reported in export_info; only show the matching one.
+function exportResult(next){
+ const info=next.export_info;
+ if(!info||!window.ExportScope?.matches(info,next.project?.root))return {status:'idle',logs:[]};
+ return info;
+}
 function renderExport(next){
- const info=next.project&&next.export_info?.project===next.project.root?next.export_info:{status:'idle',logs:[]};
+ const info=exportResult(next);
  const busy=['starting','running'].includes(info.status);
- $('#export-status').textContent=info.status==='completed'&&info.target==='maixcam'?'MaixCAM ONNX 检查通过，下一步到 MaixHub 量化':({idle:'尚未运行',starting:'正在准备转换',running:'正在转换 / 量化',completed:'转换完成',failed:'转换失败，请查看日志',stopped:'已停止，未完成文件请勿部署'}[info.status]||info.status);
+ $('#export-status').textContent=info.status==='completed'&&info.target==='maixcam'?'MaixCAM '+(info.family_label?info.family_label+' ':'')+'ONNX 检查通过，下一步到 MaixHub 量化':({idle:'尚未运行',starting:'正在准备转换',running:'正在转换 / 量化',completed:'转换完成',failed:'转换失败，请查看日志',stopped:'已停止，未完成文件请勿部署'}[info.status]||info.status);
  $('#export-output').textContent=info.output||'';
  const logs=$('#export-log'),text=(info.logs||[]).join('\n');
  if(logs.textContent!==text){logs.textContent=text;logs.scrollTop=logs.scrollHeight;}
- $('#export-start').disabled=exportPending||busy||!next.ready||!next.project;
+ $('#export-start').disabled=exportPending||busy||!next.ready||!$('#export-model').value;
  $('#export-stop').disabled=!busy;
- $('#export-folder').disabled=!next.project;
+ $('#export-folder').disabled=!next.ready;
 }
 function exportSettings(){
  const maixcam=$('#export-mode').value==='maixcam';
@@ -856,13 +908,13 @@ function exportSettings(){
  $('#export-target-info').textContent='转换目标：'+(torch?'TorchScript（.torchscript）':'ONNX（.onnx）')+' · '+precision.value.toUpperCase()+(int8?' · 需要校准图片':' · 无需校准图片');
  $('#export-hint').textContent='格式和精度要按最终运行模型的软件、设备来选。文件转换完成后，请用真实图片检查识别效果，再比较速度；模型变小不代表一定更快。';
  if(maixcam){
-  $('#export-target-info').textContent='转换目标：MaixCAM / Pro · ONNX FP32 · '+$('#export-width').value+' × '+$('#export-height').value+'（宽 × 高） · YOLO26 检测';
-  $('#export-hint').textContent='仅支持标准 YOLO26 检测模型（保留 one2one 分支）。默认 320×224；导出后检查六个 MaixHub 节点和输入尺寸，并附使用说明、类别表。在 MaixHub 选择 YOLO26，提供 20～100 张真实校准图片完成量化，下载 .mud 与 .cvimodel。当前不包含 MaixCAM2 或其他 YOLO 系列适配。';
+  $('#export-target-info').textContent='转换目标：MaixCAM / Pro · ONNX FP32 · '+$('#export-width').value+' × '+$('#export-height').value+'（宽 × 高） · YOLOv5u / YOLOv8 / YOLO11 / YOLO26 检测';
+  $('#export-hint').textContent='支持 YOLOv5u、YOLOv8、YOLO11、YOLO26 的目标检测权重，导出时按实际网络结构识别版本；旧版 ultralytics/yolov5 不支持。默认 320×224，两边须为 32 的倍数。导出后检查输入尺寸、输出结构和一次 CPU 推理，并附使用说明与类别表。在 MaixHub 选择识别出的版本和实际板型，提供 20～100 张真实校准图片完成量化，下载 .mud 与 .cvimodel。当前不包含 MaixCAM2 适配。';
  }
 }
 for(const id of ['export-mode','export-format','export-precision','export-height','export-width'])$('#'+id).onchange=exportSettings;exportSettings();
-$('#export-model').onchange=()=>refreshExportSource();
-$('#export-local').onclick=async()=>{await localWeights('#export-model');refreshExportSource();};
+$('#export-model').onchange=()=>{refreshExportSource();renderExport(state);};
+$('#export-local').onclick=async()=>{await localWeights('#export-model');refreshExportSource();renderExport(state);};
 $('#export-choose-calibration').onclick=async()=>{const path=await api.choose('source');if(path)$('#export-calibration').value=path;};
 $('#export-folder').onclick=()=>api.results('exports');
 $('#export-stop').onclick=async()=>{try{await rpc('stop_export');}catch(error){toast(error.message);}};
@@ -871,7 +923,7 @@ $('#export-form').onsubmit=async event=>{
  try{
   await editor.save();
   await rpc('start_export',{weights:$('#export-model').value,target:$('#export-mode').value,format:$('#export-format').value,precision:$('#export-precision').value,imgsz:$('#export-mode').value==='maixcam'?[Number($('#export-height').value),Number($('#export-width').value)]:Number($('#export-imgsz').value),calibration:$('#export-calibration').value.trim(),calibration_limit:Number($('#export-calibration-limit').value)});
-  toast('转换已启动，输出保存在项目 exports 目录。');
+  toast(state.project?'转换已启动，输出保存在项目 exports 目录。':'转换已启动，输出保存在工作台 exports 目录。');
  }catch(error){toast(error.message);}finally{exportPending=false;api.state().then(update);}
 };
 

@@ -21,8 +21,8 @@
   },
   {
     "path": ".packaging/build_release.py",
-    "size": 8924,
-    "sha256": "37f84a97cdc6d1f6cbd611a0e8e33e9b632b9498293bcfa707f01dfe98f128d1"
+    "size": 8926,
+    "sha256": "f516f47ba14f8e4bfec762e4501088e62bb436fbbf5dd1520c01f3b9a501bff6"
   },
   {
     "path": ".packaging/Installer.cs",
@@ -66,8 +66,8 @@
   },
   {
     "path": ".packaging/verify_release.py",
-    "size": 5196,
-    "sha256": "8c3d4cdf76f672d88de5cd3ef223adfd0ff3f944b5158a5daf6a1068900de127"
+    "size": 5198,
+    "sha256": "48e1816a86fa9a935c974805625502180888c93723763a2266743a7a11e52130"
   },
   {
     "path": ".packaging/构建说明.md",
@@ -96,8 +96,8 @@
   },
   {
     "path": "CHANGELOG.md",
-    "size": 11464,
-    "sha256": "4a0e6c959134de967165180345b68c9b7462603c881337fadffe25081e190304"
+    "size": 13687,
+    "sha256": "96457a62eee994a608230ef7db522069d94747f1650c73fad46709fa395cfbd6"
   },
   {
     "path": "desktop/ai-preview-qa.cjs",
@@ -116,8 +116,8 @@
   },
   {
     "path": "desktop/artifact-manager.js",
-    "size": 7152,
-    "sha256": "01671c855ef79c6604228fe78c0e0dfd45558029edc76340f442fbe91354db0d"
+    "size": 7538,
+    "sha256": "3fe6f9a924200ff4ff78539addfae48e5a65648da6697941964086e58773bd2f"
   },
   {
     "path": "desktop/canvas-navigation.js",
@@ -158,6 +158,16 @@
     "path": "desktop/exit-qa.cjs",
     "size": 2971,
     "sha256": "c1f7ffa48a9f6da2e8418d1571a55ece47b56b47b57eef37d0f425b79be8c6ef"
+  },
+  {
+    "path": "desktop/export-scope.js",
+    "size": 1523,
+    "sha256": "b628cc41c4cc771bbb063acb3ba2b7f1e2a70a864027ac1ca77f70a0b7a96e39"
+  },
+  {
+    "path": "desktop/export-scope.test.cjs",
+    "size": 1867,
+    "sha256": "d37759f37b3ff1627c205ebd27962689483dec823c8ee0a48543a24d78bfd141"
   },
   {
     "path": "desktop/file-picker.cjs",
@@ -221,8 +231,8 @@
   },
   {
     "path": "desktop/main.cjs",
-    "size": 34245,
-    "sha256": "0f25b7241b0b3f47f3e5ee6852b1f6dd86c81d8713df739a668c653e979bbc7c"
+    "size": 35072,
+    "sha256": "2d0673f74e83185c98933c924d44ecb237de7dc806465ceee66f0d70da341f22"
   },
   {
     "path": "desktop/maixcam/maixcam_server.py",
@@ -322,7 +332,7 @@
   {
     "path": "desktop/package-lock.json",
     "size": 5880,
-    "sha256": "b04eb2d876122da6a7b86e8bb7df0140c1a470f111bec1b366212d48a822aec0"
+    "sha256": "6fe6be0920de283c51495a493d73d145f14fe44871792b7a7eaddb2e1c6cd1de"
   },
   {
     "path": "desktop/package-qa.cjs",
@@ -331,8 +341,8 @@
   },
   {
     "path": "desktop/package.json",
-    "size": 3027,
-    "sha256": "4040465d62bb04051e4e8ee002b7cec1e1ff2f48bceea861026cbb1f8997105b"
+    "size": 3127,
+    "sha256": "790a6189e9984ec2f7a8fb369bb040cc6f10f50e34f228d25816df61df757dd4"
   },
   {
     "path": "desktop/pages-qa.cjs",
@@ -421,18 +431,18 @@
   },
   {
     "path": "desktop/studio.css",
-    "size": 54583,
-    "sha256": "6c075d60424f4cdffab63306f8854bcd47df6b68271268a083875d1ac2c68558"
+    "size": 54623,
+    "sha256": "83fc6f6182660cd4562ed19e023d60dca1d8b060b68ae568f237983170ba4013"
   },
   {
     "path": "desktop/studio.html",
-    "size": 68863,
-    "sha256": "e0fc7baa92d711cfc8b5de3405531645bf7a9cf800c72994a68c6ed3bcfde9e4"
+    "size": 69483,
+    "sha256": "a11e5cfa464aa9cc6de575dfc66773202c69f3cd05cbb5d209c4065565ef93a7"
   },
   {
     "path": "desktop/studio.js",
-    "size": 82546,
-    "sha256": "5c8f3faa1a0f0a9d26436bad0a3fc73f3112cb4c238f4a0ebba6646756f0260d"
+    "size": 85854,
+    "sha256": "cf17d603a0d2f834c0f3a9588a2cfe54178bd78bd4bf5ff15867ac4808ca2a54"
   },
   {
     "path": "desktop/traincheck-qa.cjs",
@@ -501,8 +511,8 @@
   },
   {
     "path": "README.md",
-    "size": 14105,
-    "sha256": "67b11ce83c40fe75b3bb07478e404664ce6744b5c3b9ac69654651c291c960df"
+    "size": 15400,
+    "sha256": "1859a009806bb1b6ac58b7d875be51684840bfacf2aece2fe3dbd39286e85443"
   },
   {
     "path": "setup-linux.sh",
@@ -4181,8 +4191,8 @@
   },
   {
     "path": "X-AnyLabeling/anylabeling/services/workflow/model_export.py",
-    "size": 16473,
-    "sha256": "6b770a26c80f65c83a3b6d850235ed1fed047d5653ad5cd3c7cde3f6f0cf3e4d"
+    "size": 21334,
+    "sha256": "b4f26196b333c9eb154b4d9b3a21887d8028d08580a048692023de19f82d263e"
   },
   {
     "path": "X-AnyLabeling/anylabeling/services/workflow/predict.py",
@@ -4996,8 +5006,8 @@
   },
   {
     "path": "X-AnyLabeling/anylabeling/views/workflow/export_job.py",
-    "size": 5470,
-    "sha256": "053fa3683989efee9bd7199fec0365009244972c5423275d3b9b25c27d012ab8"
+    "size": 6415,
+    "sha256": "e65e221f68faef8537a00a02d60085ada1385e2d67178545cd87a3f18cdb3cff"
   },
   {
     "path": "X-AnyLabeling/anylabeling/views/workflow/inline_tools.py",
@@ -7686,8 +7696,8 @@
   },
   {
     "path": "X-AnyLabeling/tests/workflow/test_model_export.py",
-    "size": 6798,
-    "sha256": "4659be6f5d943eb8ef9aa4d24f8548a4edfe088573c7017f73d57517eb0e898e"
+    "size": 10626,
+    "sha256": "9913b7ea504055bb41aea787ee3a86c00deecf16e23e3585d0a57704fff2a23b"
   },
   {
     "path": "X-AnyLabeling/tests/workflow/test_model_geometry.py",
@@ -7905,6 +7915,11 @@
     "sha256": "376e8ca96b7b2c5ace20984a9a8e16e906bee0001b36ee1c485997fdb3f852ee"
   },
   {
+    "path": "文档/0.7.1_发布检查.md",
+    "size": 1873,
+    "sha256": "36c86d4f65a889141dbbc8fc3d7f1b2c07b42645c565928dd5e941a92fe301a5"
+  },
+  {
     "path": "文档/0.7_发布检查.md",
     "size": 2329,
     "sha256": "9600dce19f722893815071fcb8653f04624537dd29d69b3b059c52490cc7603a"
@@ -7916,8 +7931,8 @@
   },
   {
     "path": "文档/MaixCAM导出模式.md",
-    "size": 2036,
-    "sha256": "1e83049303be752cb3b3c0107f33133f3316595cadba907a3347c44bf8b3d766"
+    "size": 4068,
+    "sha256": "22257bb4d7d3dcf9456237d1eb0ff39b1a04665897a82f697cc3cf1894f8ea1f"
   },
   {
     "path": "文档/Ubuntu依赖锁定.txt",
@@ -7935,14 +7950,24 @@
     "sha256": "332aaf5571ad6f0abd665fa2f3c815c5fc02d3470846f3aa5d6fab20b73e79e6"
   },
   {
+    "path": "文档/v0.7.1_发布说明.md",
+    "size": 3087,
+    "sha256": "db61db9200e2c421a85f9be58e69252bdeafff7dc100bf4d78f9a5e5d4902d7f"
+  },
+  {
+    "path": "文档/v0.7.1_安装说明.md",
+    "size": 4379,
+    "sha256": "9b626374fdd1acfa82460222010f2b318923e8222a9172397beb24680910ceac"
+  },
+  {
     "path": "文档/v0.7_发布说明.md",
-    "size": 3950,
-    "sha256": "32326ac2f23c82431e4371ea5b3a09ab5a6d0bf44fbddf8b610f4ec7f4091b87"
+    "size": 3983,
+    "sha256": "733a7b5e60ceeaedb1a1e021bed5b3be9490adf9d0c0473f2ea61b6ff316b24a"
   },
   {
     "path": "文档/v0.7_安装说明.md",
-    "size": 4016,
-    "sha256": "c204f51a6c73b26c9ae2b1a1098c13afa4e425db4678c957dc239061d5d21dad"
+    "size": 4075,
+    "sha256": "fc490b10b47fcf4495a7908a940b19733f16e51f7faacf632f2e8da5998aaa19"
   },
   {
     "path": "文档/Windows依赖锁定.txt",
@@ -7986,8 +8011,8 @@
   },
   {
     "path": "文档/安装后使用.md",
-    "size": 7472,
-    "sha256": "3ce891f53fd25b13b46b69e4f1c8162be888a9ac9a62740a169e1c3351be67ed"
+    "size": 7972,
+    "sha256": "763494ac3d100816f074fb6a050c529a5078312e12e004163166e6c9671c643b"
   },
   {
     "path": "文档/快速保存切图与视频微调总览-20261018.md",
@@ -8046,8 +8071,8 @@
   },
   {
     "path": "文档/模型转换与量化.md",
-    "size": 3701,
-    "sha256": "a215a9983499bc5a931815078727c38eba8a0cf11f6c5582d9dd64b64c02eeb1"
+    "size": 7952,
+    "sha256": "88cd118c6043ad16c774b7597f52abc5ccf101f88020a13c600fe2d8519484f9"
   },
   {
     "path": "文档/界面预览/Electron-Dark.png",

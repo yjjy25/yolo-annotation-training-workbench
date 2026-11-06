@@ -6,8 +6,12 @@ const readline = require('node:readline');
 
 const packaged=fs.existsSync(path.join(process.resourcesPath,'workbench'));
 const ROOT=packaged?path.join(process.resourcesPath,'workbench'):path.resolve(__dirname,'..');
+const ExportScope=require('./export-scope.js');
 const portable=packaged&&fs.existsSync(path.join(path.dirname(process.execPath),'portable.flag'));
 const RUNTIME=packaged?(portable?path.join(path.dirname(process.execPath),'工作台数据'):path.join(app.getPath('appData'),'AnnotationTrainingWorkbench')):path.join(ROOT,'.runtime');
+// The same profile the backend receives as XAL_PROFILE_HOME / XAL_WORKBENCH_HOME.
+// Conversions started without a project are written beside it (profile/exports).
+const PROFILE=process.env.XAL_ELECTRON_QA?path.join(process.env.XAL_QA_STORAGE_ROOT||RUNTIME,'electron-qa'):RUNTIME;
 fs.mkdirSync(RUNTIME,{recursive:true});
 app.setPath('userData',path.join(RUNTIME,process.env.XAL_ELECTRON_QA?'electron-qa-user':'electron-user'));
 const PREFS=path.join(RUNTIME,process.env.XAL_ELECTRON_QA?'qa-desktop-preferences.json':'desktop-preferences.json');
@@ -120,7 +124,7 @@ function startBackend(){
   ready=false;
   const handle=win.getNativeWindowHandle();
   const parent=process.platform==='win32'?(handle.length>=8?handle.readBigUInt64LE().toString():String(handle.readUInt32LE())):'0';
-  const profile=process.env.XAL_ELECTRON_QA?path.join(process.env.XAL_QA_STORAGE_ROOT||RUNTIME,'electron-qa'):RUNTIME;
+  const profile=PROFILE;
   backend=spawn(python,['-u',path.join(ROOT,'.runtime','launcher.pyw')],{cwd:ROOT,windowsHide:true,stdio:['pipe','pipe','pipe'],env:{...process.env,XAL_ELECTRON:'1',XAL_INTEGRATED_EDITOR:'1',XAL_OFFSCREEN_TOOLS:'1',QT_QPA_PLATFORM:'offscreen',QT_SCALE_FACTOR:'1',XAL_PROFILE_HOME:profile,YOLO_CONFIG_DIR:path.join(profile,'ultralytics'),XAL_FONT_FILE:path.join(ROOT,'.runtime','fonts','NotoSansSC.ttf'),XAL_PRETRAINED_HOME:path.join(ROOT,'.runtime','pretrained'),XAL_EMBED_PARENT:parent,XAL_THEME:nativeTheme.shouldUseDarkColors?'dark':'light',PYTHONIOENCODING:'utf-8'}});
   const startupTimer=setTimeout(()=>{if(!ready&&backend?.exitCode===null){current.error='本地引擎启动超过 60 秒，请查看启动日志。画布直接集成在工具内，无需连接外部服务。';publish();}},60000);
   readline.createInterface({input:backend.stdout}).on('line',line=>{
@@ -239,7 +243,18 @@ ipcMain.handle('desktop:pose-reference',(_event,options={})=>{
   if(bitmap.isEmpty())throw new Error('参考照片无法解码。');
   return {url:bitmap.toDataURL(),annotation,note,source};
 });
-ipcMain.handle('desktop:results',(_event,kind)=>current.project?shell.openPath(path.join(current.project.root,kind==='exports'?'exports':'runs')):null);
+ipcMain.handle('desktop:results',(_event,kind)=>{
+  if(kind!=='exports')return current.project?shell.openPath(path.join(current.project.root,'runs')):null;
+  // Prefer the folder of the conversion the page is showing; fall back to the
+  // project (or profile) exports folder so the button works before the first run.
+  const info=current.export_info;
+  const owned=ExportScope.matches(info,current.project?.root);
+  const run=owned?String(info.run||''):'';
+  if(run&&fs.existsSync(run))return shell.openPath(run);
+  const directory=current.project?path.join(current.project.root,'exports'):path.join(PROFILE,'exports');
+  try{fs.mkdirSync(directory,{recursive:true});}catch{return null;}
+  return shell.openPath(directory);
+});
 ipcMain.handle('desktop:validation-history',()=>{
   if(!current.project)return [];
   const directory=path.join(current.project.root,'validation');
