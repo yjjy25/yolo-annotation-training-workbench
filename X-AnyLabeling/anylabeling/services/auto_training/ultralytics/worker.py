@@ -351,6 +351,7 @@ def run_train(payload: dict) -> None:
         raise ValueError(
             f"Unsupported training arguments: {', '.join(sorted(unsupported))}"
         )
+    emit("training_initializing", message="正在检查 PyTorch 和训练设备…")
     import torch
 
     validate_selected_device(torch, train_args.get("device"))
@@ -361,19 +362,33 @@ def run_train(payload: dict) -> None:
     matplotlib.use("Agg")
     from ultralytics import YOLO
 
-    emit("training_started", total_epochs=train_args.get("epochs", 100))
     log_stream = EventLogStream("training_log")
     original_stdout, original_stderr = sys.stdout, sys.stderr
     try:
         sys.stdout = log_stream
         sys.stderr = log_stream
-        from anylabeling.services.workflow.model_design.training import load_training_model
-        model = load_training_model(train_args.pop("model"))
+        source = train_args.pop("model")
+        from anylabeling.services.workflow.training_weights import download_training_weight, training_catalog
+        known = {item["name"] for task in ("detect", "segment", "pose", "obb", "classify")
+                 for item in training_catalog(weights_directory, task)}
+        if source in known and not Path(source).is_file():
+            source = download_training_weight(source, weights_directory,
+                lambda message: emit("training_initializing", message=message))
+        emit("training_initializing", message=f"正在{'生成模型结构并随机初始化参数' if train_args.get('pretrained') is False else '加载初始权重'}：{Path(source).name}…")
+        if Path(source).suffix.lower() in {".yaml", ".yml"}:
+            from anylabeling.services.workflow.model_design.training import load_training_model
+            model = load_training_model(source)
+        else:
+            model = YOLO(source)
+        emit("training_started", total_epochs=train_args.get("epochs", 100))
         attach_training_progress(model)
         train_args["verbose"] = False
         train_args["show"] = False
-        from anylabeling.services.workflow.model_design.training import train_model
-        train_model(model, train_args)
+        if "workbench_design" in getattr(getattr(model, "model", None), "yaml", {}):
+            from anylabeling.services.workflow.model_design.training import train_model
+            train_model(model, train_args)
+        else:
+            model.train(**train_args)
     finally:
         log_stream.flush()
         sys.stdout, sys.stderr = original_stdout, original_stderr

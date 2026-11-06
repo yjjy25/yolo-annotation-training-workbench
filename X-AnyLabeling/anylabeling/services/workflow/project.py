@@ -194,7 +194,7 @@ class Project:
             assignments = data.get("assignments")
             if isinstance(assignments, dict):
                 still_present = any(digest(p) == content_hash for p in self.images)
-                for key in [k for k in assignments if Path(k).stem == stem or (k == content_hash and not still_present)]:
+                for key in [k for k in assignments if k == "image:" + path.name or Path(k).stem == stem or (k == content_hash and not still_present)]:
                     assignments.pop(key)
                     dropped += 1
                 if dropped:
@@ -243,15 +243,17 @@ class Project:
             seed = int(options.get("split_seed", options.get("seed", self.data.get("split_seed", 42))))
         except (TypeError, ValueError):
             seed = 42
-        return {"mode": mode, "ratio": ratio, "count": count, "seed": seed}
+        # Missing values preserve the policy of existing API clients and splits.
+        grouped = options.get("split_grouped", options.get("grouped", True)) is True
+        return {"mode": mode, "ratio": ratio, "count": count, "seed": seed, "grouped": grouped}
 
     def split_preview(self, options=None):
-        """Preview the same whole-source plan used by snapshot construction."""
+        """Preview the selected split policy used by snapshot construction."""
         from .dataset_split import create_plan
         return create_plan(self, options)["preview"]
 
     def build_dataset(self, options=None):
-        """Freeze reviewed data with indivisible source/verified duplicate groups.
+        """Freeze reviewed data using individual images or source/duplicate groups.
 
         Existing assignments remain fixed unless split settings change. Conflicts
         discovered in an old split block publication instead of silently leaking
@@ -259,6 +261,7 @@ class Project:
         """
         from anylabeling.views.labeling.label_converter import LabelConverter
         from .dataset_split import create_plan
+        from .snapshot_store import publish_image
         plan = create_plan(self, options)
         preview = plan["preview"]
         if not preview["ready"]:
@@ -276,7 +279,7 @@ class Project:
                 image = self.root / "images" / name
                 label = self.annotation(image)
                 content_hash = record["fingerprint"]["sha256"]
-                part = plan["assignments"][content_hash]
+                part = plan["assignments"][record["split_key"]]
                 data = record["annotation"]
                 if task == "classify":
                     names = [c for c, enabled in data.get("flags", {}).items() if enabled and c in self.data["classes"]]
@@ -286,7 +289,9 @@ class Project:
                 else:
                     destination = target / "images" / part / image.name
                 destination.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(image, destination)
+                # Snapshots share one content-addressed object instead of
+                # storing another full copy of every reviewed JPEG.
+                publish_image(self.root, image, destination, content_hash)
                 archived = target / "annotations" / label.name
                 archived.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(label, archived)
@@ -324,6 +329,13 @@ class Project:
                                                    "grouping": plan["metadata"]})
         except Exception:
             shutil.rmtree(target)
+            # A half-built snapshot may already have published shared objects;
+            # drop the ones no surviving snapshot references.
+            try:
+                from .snapshot_store import prune_objects
+                prune_objects(self.root, apply=True)
+            except Exception:
+                pass
             raise
         return target if task == "classify" else target / "data.yaml"
 

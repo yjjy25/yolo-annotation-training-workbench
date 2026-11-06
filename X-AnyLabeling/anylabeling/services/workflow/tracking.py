@@ -13,7 +13,7 @@ import numpy as np
 
 from .project import Project, digest, read_json, write_json
 from .desktop import image_path, save_annotation
-from .video import import_video, sequences
+from .video import import_video, sequences, encode_frame
 from .video_workspace import frame_store, frame_name, cache_path, archive_future_auto
 
 
@@ -99,12 +99,10 @@ def advance_session(project, args):
         ok, image = capture.retrieve()
         if not ok:
             raise ValueError("视频帧解码失败。")
-        name = f"{record['id']}_{number:09d}.jpg"
+        name = frame_name(record,number)
         path = project.root / "images" / name
         if not path.exists():
-            ok, encoded = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, 95])
-            if not ok:
-                raise ValueError("视频帧保存失败。")
+            encoded = encode_frame(image,Path(name).suffix)
             with path.open("xb") as stream:
                 stream.write(encoded.tobytes())
         if not any(f["name"] == name for f in record["frames"]):
@@ -411,8 +409,7 @@ def run(project, args, report, cancelled=lambda: False, preview=None):
             if record.get("storage")!="video-work" or (old is not None and (old.get("tracking",{}).get("manual_edited") or name in record.get("accepted",{}))):
                 return name, False
         if not destination.exists():
-            ok, encoded = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
-            if not ok:raise ValueError("视频帧保存失败。")
+            encoded = encode_frame(frame,Path(name).suffix)
             with destination.open("xb") as stream:stream.write(encoded.tobytes())
         if not any(f["name"]==name for f in record["frames"]):
             record["frames"].append({"name": name, "frame": number, "seconds": number / fps})
@@ -507,14 +504,12 @@ def main(payload):
     args = read_json(payload)
     report_path = Path(payload).with_name("progress.json")
     def present(image, frame, annotation):
-        ok, encoded=cv2.imencode(".jpg",image,[cv2.IMWRITE_JPEG_QUALITY,85])
-        if not ok:
-            raise TrackingLost("预览帧编码失败，已暂停。")
+        encoded=encode_frame(image)
         data=copy.deepcopy(annotation)
         data.update(imageWidth=image.shape[1],imageHeight=image.shape[0],checked=False)
         preview_path=Path(payload).with_name(f"preview-{frame}.json")
         write_json(preview_path,{"frame":frame,"annotation":data,
-                   "image_url":"data:image/jpeg;base64,"+base64.b64encode(encoded.tobytes()).decode("ascii")})
+                   "image_url":"data:image/png;base64,"+base64.b64encode(encoded.tobytes()).decode("ascii")})
         deadline=time.monotonic()+20
         ack=Path(payload).with_name(f"preview-ack-{frame}")
         while not ack.exists():

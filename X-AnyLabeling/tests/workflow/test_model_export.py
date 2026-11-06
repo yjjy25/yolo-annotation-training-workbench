@@ -2,6 +2,7 @@ from pathlib import Path
 import json
 import pytest
 from anylabeling.services.workflow.model_export import options, run, quantize_unicode, inspect_weights
+from anylabeling.services.workflow.model_export import maixcam_head, check_maixcam
 
 
 def payload(tmp_path, **kwargs):
@@ -84,3 +85,64 @@ def test_unicode_shape_inference_and_restoration(tmp_path):
     with pytest.raises(RuntimeError, match='cleanup'):
         quantize_unicode(onnx, quantizer, model, str(output), None)
     assert onnx.shape_inference.infer_shapes_path is original
+
+
+@pytest.mark.parametrize('change', [dict(target='unknown'), dict(format='torchscript'),
+                                  dict(precision='int8'), dict(imgsz=224), dict(imgsz=[224]),
+                                  dict(imgsz=[True, 320]), dict(imgsz=[240, 320]),
+                                  dict(imgsz=[224, 320, 640])])
+def test_maixcam_rejects_invalid_configuration(tmp_path, change):
+    args = payload(tmp_path, target='maixcam')
+    args.update(change)
+    with pytest.raises(ValueError):
+        options(args)
+
+
+def test_maixcam_defaults_and_generic_compatibility(tmp_path):
+    assert options(payload(tmp_path, target='maixcam'))['imgsz'] == [224, 320]
+    config = options(payload(tmp_path))
+    assert config['target'] == 'generic' and config['imgsz'] == 640
+
+
+def test_maixcam_head_rejects_wrong_task_and_missing_branch():
+    from types import SimpleNamespace as NS
+    head = type('Detect', (), dict(reg_max=1, nl=3, nc=3, one2one_cv2=[], one2one_cv3=[]))()
+    model = NS(task='detect', model=NS(model=[None] * 23 + [head]))
+    assert maixcam_head(model) == 3
+    head.one2one_cv2 = None
+    with pytest.raises(ValueError, match='one2one'):
+        maixcam_head(model)
+    head.one2one_cv2 = []
+    model.task = 'segment'
+    with pytest.raises(ValueError, match='Detect'):
+        maixcam_head(model)
+
+
+def test_maixcam_exact_profile_and_shape_validation():
+    import onnx
+    from onnx import helper, TensorProto
+    def value(name, shape):
+        return helper.make_tensor_value_info(name, TensorProto.FLOAT, shape)
+    # Minimal independent Conv branches exercise the profile contract, no trained weights needed.
+    nodes, inputs, outputs = [], [value('images', [1, 3, 224, 320])], []
+    for branch, channels in ((2, 4), (3, 3)):
+        for scale, stride in enumerate((8, 16, 32)):
+            name = f'/model.23/one2one_cv{branch}.{scale}/one2one_cv{branch}.{scale}.2/Conv_output_0'
+            x, w = f'x{branch}{scale}', f'w{branch}{scale}'
+            inputs.extend([value(x, [1, 3, 224 // stride, 320 // stride]), value(w, [channels, 3, 1, 1])])
+            nodes.append(helper.make_node('Conv', [x, w], [name]))
+            outputs.append(value(name, [1, channels, 224 // stride, 320 // stride]))
+    graph = helper.make_model(helper.make_graph(nodes, 'profile', inputs, outputs))
+    # Profile input must be a single static RGB tensor; internal test tensors are initializers.
+    import numpy as np
+    for item in inputs[1:]:
+        graph.graph.initializer.append(onnx.numpy_helper.from_array(np.zeros([d.dim_value for d in item.type.tensor_type.shape.dim], dtype=np.float32), item.name))
+    del graph.graph.input[1:]
+    assert len(check_maixcam(graph, [224, 320], 3)['nodes']) == 6
+    with pytest.raises(ValueError, match='输入形状'):
+        check_maixcam(graph, [320, 224], 3)
+    with pytest.raises(ValueError, match='检测分支'):
+        check_maixcam(graph, [224, 320], 4)
+    graph.graph.node[-1].output[0] = 'ordinary-cv3-output'
+    with pytest.raises(ValueError, match='检测分支'):
+        check_maixcam(graph, [224, 320], 3)

@@ -27,7 +27,19 @@ def run(root, request):
     baseline = build(baseline_design)
     base_info = inspect_model(baseline)
     del baseline  # Release baseline weights before forward/backward for larger scales.
-    model = build(design)
+    from .geometry import GeometryConflict
+    try:
+        model = build(design)
+    except GeometryConflict as error:
+        info = inspect_model(error.model)
+        for node in info["graph"]:
+            node["execution"] = error.modules.get(node["id"])
+        return {"design": design, "baseline": base_info, "modified": info,
+                "parameter_delta": info["parameters"] - base_info["parameters"],
+                "initialization": "几何检查未通过；尚未保存修订，不可训练。",
+                "conflicts": [error.diagnostic], "shapes": error.operators,
+                "measurement": {"measured_at": datetime.now(timezone.utc).isoformat(),
+                    "mode": "eval", "complete": False, "design_hash": content_hash(design), "id": uuid.uuid4().hex}}
     info = inspect_model(model)
     execution = trace_model(model, design["imgsz"])
     for index, node in enumerate(info["graph"]):
@@ -38,6 +50,8 @@ def run(root, request):
               "shapes": operator_shapes, "execution": execution, "design": design, "baseline": base_info, "modified": info,
               "parameter_delta": info["parameters"] - base_info["parameters"],
               "initialization": "随机初始化；兼容层同种子，改核层重新初始化；未加载预训练权重。"}
+    if hasattr(model, "geometry_checks"):
+        result["geometry_checks"] = model.geometry_checks
     result["source_code"] = {}
     for path, module in model.named_modules(remove_duplicate=False):
         if path and (not list(module.children()) or path in {row["id"] for row in info["graph"]}):
@@ -104,7 +118,7 @@ def run(root, request):
     folder.mkdir(parents=True, exist_ok=False)
     sources = folder / "sources"
     sources.mkdir()
-    source_files = {Path(__file__), Path(__file__).with_name("core.py"), Path(__file__).with_name("training.py"), Path(__file__).with_name("reference.py"), Path(source["path"])}
+    source_files = {Path(__file__), Path(__file__).with_name("core.py"), Path(__file__).with_name("training.py"), Path(__file__).with_name("reference.py"), Path(__file__).with_name("geometry.py"), Path(source["path"])}
     source_files.update(Path(source["path"]).parents[3] / name for name in source["implementations"])
     source_files.update(Path(row["source"]["path"]) for row in info["layers"] if "path" in row["source"])
     source_manifest = []

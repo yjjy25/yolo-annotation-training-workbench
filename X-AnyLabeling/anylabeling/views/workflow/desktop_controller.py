@@ -39,6 +39,10 @@ class DesktopController(QtCore.QObject):
         return self.workflow.project
 
     def call(self,method,args):
+        if method=="training_model_catalog":
+            from anylabeling.services.workflow.training_weights import training_catalog
+            project=self.project()
+            return training_catalog(project.root,project.data["task"])
         if method=="model_design_catalog":
             from anylabeling.services.workflow.model_design.core import catalog
             return catalog()
@@ -460,10 +464,6 @@ class DesktopController(QtCore.QObject):
         self.ensure_switchable()
         project=self.project()
         model=str(args.get("model", "yolov8n.pt")).strip()
-        cache=Path(os.environ["XAL_WORKBENCH_HOME"])/"pretrained"/model
-        if not cache.is_file():cache=Path(os.environ.get("XAL_PRETRAINED_HOME",str(cache.parent)))/model
-        if cache.is_file():
-            model=str(cache)
         values={"epochs":(1,10000,100),"batch":(1,512,4),"imgsz":(32,4096,640),"workers":(0,16,0),"patience":(0,10000,50)}
         options={}
         for key,(low,high,default) in values.items():
@@ -508,8 +508,11 @@ class DesktopController(QtCore.QObject):
         if optimizer not in {"SGD","Adam","AdamW","NAdam","RAdam","RMSProp","auto"}:
             raise ValueError("优化器无效。")
         options["optimizer"]=optimizer
+        from anylabeling.services.workflow.training_weights import resolve_training_weight
+        initialization=args.get("initialization","pretrained")
+        model=resolve_training_weight(model,project.root,args.get("allow_download",True) is True,initialization)
         design_report=None
-        if Path(model).suffix.lower() in {".yaml", ".yml"}:
+        if initialization!="scratch" and Path(model).suffix.lower() in {".yaml", ".yml"}:
             if project.data["task"]!="detect":
                 raise ValueError("设计模型当前仅支持目标检测项目。")
             from anylabeling.services.workflow.model_design.core import checked_configuration
@@ -522,6 +525,7 @@ class DesktopController(QtCore.QObject):
         name="train_"+time.strftime("%Y%m%d_%H%M%S")
         run=project.root/"runs"/name
         options.update(model=model,data=str(dataset),project=str(project.root/"runs"),name=name,device=device,lr0=lr,amp=bool(args.get("amp",False)),plots=True,cache=False,save=True,val=True)
+        if initialization=="scratch":options["pretrained"]=False
         if project.data["task"]=="pose" and not project.data["template"].get("pairs"):
             options.update(fliplr=0.,flipud=0.)
         if design_report:
@@ -579,9 +583,13 @@ class DesktopController(QtCore.QObject):
                     self.training["progress"]={key:value for key,value in event.items() if key not in ("event","version")}
                     self.bridge.publish_state()
                     continue
+                if event["event"]=="training_initializing":
+                    self.training["initialization_message"]=event.get("message","正在初始化…")
+                    line=self.training["initialization_message"]
+                    self.bridge.publish_state()
                 if event["event"]=="training_started":self.training["status"]="training"
                 if event["event"]=="training_error":self.training.update(status="failed",error=event.get("error"))
-                if event["event"]=="training_log":line=event.get("message","")
+                if event["event"] in {"training_log","training_initializing"}:line=event.get("message","")
                 else:line=event.get("error",event["event"])
             line=re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]","",line).replace("\r","")
             entries.append(line)

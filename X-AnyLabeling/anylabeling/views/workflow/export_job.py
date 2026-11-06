@@ -33,7 +33,7 @@ class ExportJob(QtCore.QObject):
         payload.parent.mkdir(parents=True, exist_ok=True)
         payload.write_text(json.dumps({**args, 'root': str(root)}, ensure_ascii=False), encoding='utf-8')
         self.payload = payload
-        self.info = {'status': 'starting', 'logs': [], 'project': str(root), 'format': config['format'], 'precision': config['precision']}
+        self.info = {'status': 'starting', 'logs': [], 'project': str(root), 'format': config['format'], 'precision': config['precision'], 'target': config['target']}
         self.buffer = ''
         process = self.process = QtCore.QProcess(self)
         process.setProcessChannelMode(QtCore.QProcess.ProcessChannelMode.MergedChannels)

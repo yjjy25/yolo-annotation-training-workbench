@@ -50,6 +50,7 @@
    document.addEventListener('keydown',e=>this.key(e));
    $('#tool-select').onclick=()=>this.setMode('select');$('#tool-draw').onclick=()=>{if(this.project?.task==='classify')this.classify();else this.setMode('draw');};
    $('#finish-polygon').onclick=()=>this.finishPolygon();$('#undo').onclick=()=>this.undo();$('#redo').onclick=()=>this.redo();$('#fit-image').onclick=()=>this.fit();
+   $('#native-image').onclick=()=>this.nativeSize();
    $('#delete-shape').onclick=()=>this.remove();$('#relabel-selected').onclick=()=>this.relabel();
    const marqueeButton=$('#marquee-delete');
    if(marqueeButton)marqueeButton.onclick=()=>{
@@ -199,7 +200,7 @@
    }
    if(this.pose){const t=this.project.template;text='点击骨点 '+(this.pose.index+1)+' / '+t.points.length+'：'+(t.display||t.points)[this.pose.index];}
    $('#tool-hint').textContent=text;
-   $('#shortcut-hint').textContent='A/D 切图 · Enter 审核 · S 保存 · Q 下个标签 · Shift+Q 上个标签 · V 选择 / R 画图 · Ctrl+Z 撤销';
+   $('#shortcut-hint').textContent='A/D 切图 · Enter 审核 · S 保存 · Q 下个标签 · Shift+Q 上个标签 · V 选择 / W 标注（R 也可） · Ctrl+Z 撤销';
    // The button stays available whenever a contour is open so it cannot be missed.
    const finish=$('#finish-polygon');
    if(finish){
@@ -246,6 +247,13 @@
    this.size=[r.width,r.height];if(this.image){this.zoom=Math.min((r.width-46)/this.image.naturalWidth,(r.height-46)/this.image.naturalHeight);this.offset=[(r.width-this.image.naturalWidth*this.zoom)/2,(r.height-this.image.naturalHeight*this.zoom)/2];}
    this.render();
   }
+  nativeSize(){
+   if(!this.image)return;
+   const r=this.canvas.getBoundingClientRect();
+   this.zoom=1/(devicePixelRatio||1);
+   this.offset=[(r.width-this.image.naturalWidth*this.zoom)/2,(r.height-this.image.naturalHeight*this.zoom)/2];
+   this.render();
+  }
   toImage(e){const r=this.canvas.getBoundingClientRect();return [(e.clientX-r.left-this.offset[0])/this.zoom,(e.clientY-r.top-this.offset[1])/this.zoom];}
   clamp(p){return [Math.max(0,Math.min(this.image.naturalWidth,p[0])),Math.max(0,Math.min(this.image.naturalHeight,p[1]))];}
   onImage(p){return this.image&&p[0]>=0&&p[1]>=0&&p[0]<=this.image.naturalWidth&&p[1]<=this.image.naturalHeight;}
@@ -275,7 +283,9 @@
    }
    const ctx=this.ctx,dpr=devicePixelRatio||1;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,this.canvas.width/dpr,this.canvas.height/dpr);
    if(!this.image||!this.data){$('#canvas-empty').hidden=false;return;}
-   ctx.save();ctx.translate(...this.offset);ctx.scale(this.zoom,this.zoom);ctx.drawImage(this.image,0,0);
+   ctx.save();ctx.translate(...this.offset);ctx.scale(this.zoom,this.zoom);
+   ctx.imageSmoothingEnabled=this.zoom*dpr<1;ctx.imageSmoothingQuality='high';
+   ctx.drawImage(this.image,0,0);
    const draw=(s,index,candidate=false)=>{
     const p=s.points;if(!p?.length)return;const color=candidate?'#f5bc60':this.color(s);ctx.lineWidth=(index===this.selected?2.5:1.5)/this.zoom;ctx.strokeStyle=color;ctx.fillStyle=color+'22';ctx.setLineDash(candidate?[7/this.zoom,5/this.zoom]:[]);
     if(s.shape_type==='point'){ctx.beginPath();ctx.arc(p[0][0],p[0][1],5/this.zoom,0,Math.PI*2);ctx.fillStyle=s.difficult?'#10151f':color;ctx.fill();ctx.strokeStyle=s.difficult?color:'#10151f';ctx.lineWidth=(s.difficult?2:1)/this.zoom;ctx.stroke();if(s.difficult){ctx.beginPath();ctx.moveTo(p[0][0]-2/this.zoom,p[0][1]-2/this.zoom);ctx.lineTo(p[0][0]+2/this.zoom,p[0][1]+2/this.zoom);ctx.moveTo(p[0][0]-2/this.zoom,p[0][1]+2/this.zoom);ctx.lineTo(p[0][0]+2/this.zoom,p[0][1]-2/this.zoom);ctx.stroke();}}
@@ -326,7 +336,7 @@
    }
    if(this.drag?.kind==='new'){const kind=this.drag.shape||'rectangle';const pts=kind==='circle'?circlePoints(this.drag.start,this.drag.end):rect(this.drag.start,this.drag.end);draw({points:pts,label:this.activeClass,shape_type:'polygon'},-1);}
    if(this.project.task==='classify'){const name=this.project.classes.find(c=>this.data.flags[c]);if(name){ctx.font=(16/this.zoom)+'px "Microsoft YaHei UI"';ctx.fillStyle='#10151feb';ctx.fillRect(0,0,ctx.measureText(name+(this.data.occluded?' · 遮挡':'')).width+30/this.zoom,36/this.zoom);ctx.fillStyle='#f6c66b';ctx.fillText(name+(this.data.occluded?' · 遮挡':''),12/this.zoom,24/this.zoom);}}
-   ctx.restore();$('#zoom-value').textContent=Math.round(this.zoom*100)+'%';
+   ctx.restore();$('#zoom-value').textContent=this.image.naturalWidth+'×'+this.image.naturalHeight+' · '+Math.round(this.zoom*100)+'%';
   }
   // The rotation grip floats just outside the box, pointing away from its centre.
   // When the box hugs the picture edge that direction would put the grip on the
@@ -844,7 +854,7 @@
    if(e.key==='['||e.key===']'){e.preventDefault();this.cycleClass(e.key===']'?1:-1);return;}
    if(e.ctrlKey||e.metaKey||e.altKey)return;
    if(e.key.toLowerCase()==='v')this.setMode('select');
-   if(e.key.toLowerCase()==='r'&&this.project?.task!=='classify')this.setMode('draw');
+   if(!e.isComposing&&['w','r'].includes(e.key.toLowerCase())&&this.project?.task!=='classify'){e.preventDefault();if(!e.repeat)this.setMode('draw');return;}
    if(e.key.toLowerCase()==='a')this.callbacks.navigate(-1);
    if(e.key.toLowerCase()==='d')this.callbacks.navigate(1);
    if(!e.ctrlKey&&!e.metaKey&&!e.altKey&&/^[1-9]$/.test(e.key)&&this.project?.classes[Number(e.key)-1])this.chooseClass(this.project.classes[Number(e.key)-1]);

@@ -1,10 +1,15 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const source=fs.readFileSync(require('node:path').join(__dirname,'studio.js'),'utf8');
 const code=source.slice(source.indexOf('let splitPending=null;'),source.indexOf("$('#training-form').onsubmit="));
+const controls={'#split-mode':{value:'ratio'},'#split-ratio':{value:'20'},'#split-count':{value:'1'},'#split-seed':{value:'42'},'#split-grouped':{checked:false}};
+const argsContext={$:s=>controls[s]};vm.createContext(argsContext);
+vm.runInContext(source.slice(source.indexOf('function splitArgs()'),source.indexOf('// The state publisher')),argsContext);
+assert.equal(argsContext.splitArgs().split_grouped,false);
+controls['#split-grouped'].checked=true;assert.equal(argsContext.splitArgs().split_grouped,true);
 const nodes=new Map(),requests=[],state={ready:true,project:{root:'a',counts:{total:86,checked:23,draft:0}}};
 const ctx={state,trainingPending:false,splitKey:'',splitArgs:()=>({split_ratio:20}),$:s=>{if(!nodes.has(s))nodes.set(s,{});return nodes.get(s);},rpc:()=>new Promise((resolve,reject)=>requests.push({resolve,reject}))};
 vm.createContext(ctx);vm.runInContext(code,ctx);
-const response=(images)=>({ready:true,train:images-5,val:5,images,groups:4,similar_groups:1,video_groups:2,target_val:6,warnings:[]});
+const response=(images)=>({ready:true,train:images-5,val:5,images,groups:4,similar_groups:1,video_groups:2,target_val:6,warnings:["验证集目标 6 张，实际 5 张（整组划分或沿用已有划分）。"]});
 (async()=>{
  const first=ctx.refreshSplitPreview();for(let i=0;i<50;i++)ctx.refreshSplitPreview();assert.equal(requests.length,1,'state polling coalesces the same preview request');
  assert.equal(nodes.get('#train-start').disabled,true,'training waits for the current group check');
@@ -16,10 +21,15 @@ const response=(images)=>({ready:true,train:images-5,val:5,images,groups:4,simil
   assert.match(nodes.get(id).textContent,/同源视频组 2 组/);
   assert.match(nodes.get(id).textContent,/已识别近重复组 1 组/);
   assert.match(nodes.get(id).textContent,/验证集目标 6 张，实际 5 张/);
-  assert.match(nodes.get(id).textContent,/实际数量可能偏离目标/);
+  assert.doesNotMatch(nodes.get(id).textContent,/论文|调参|近重复检查不能覆盖/);
  }
+ const plain=ctx.describeSplitPreview({...response(23),settings:{grouped:false},warnings:[],val:6});
+ assert.doesNotMatch(plain.text,/独立组/);
+ assert.equal(plain.details,'','ordinary splits have no group diagnostics');
+ const zeros=ctx.describeSplitPreview({...response(23),video_groups:0,similar_groups:0,warnings:[]});
+ assert.equal(zeros.details,'','zero groups do not add noise');
  state.project.counts.checked=86;const next=ctx.refreshSplitPreview();assert.equal(requests.length,2,'reviewed count invalidates cached split');requests[1].resolve(response(86));await next;
- assert.match(nodes.get('#training-split-summary').textContent,/已审核 86 张/);assert.match(nodes.get('#training-split-summary').textContent,/测试集 0 张/);
+ assert.match(nodes.get('#training-split-summary').textContent,/已审核 86 张/);assert.doesNotMatch(nodes.get('#training-split-summary').textContent,/测试集 0 张/);
  state.project.counts.checked=85;const old=ctx.refreshSplitPreview();state.project={root:'b',counts:{checked:10}};const fresh=ctx.refreshSplitPreview();requests[3].resolve(response(10));await fresh;requests[2].resolve(response(85));await old;assert.match(nodes.get('#split-summary').textContent,/已审核 10 张/,'late old-project response cannot overwrite new preview');
  state.project.counts.checked=9;const fail=ctx.refreshSplitPreview();requests[4].reject(Error('temporary'));await fail;const retry=ctx.refreshSplitPreview();requests[5].resolve(response(9));await retry;assert.match(nodes.get('#split-summary').textContent,/已审核 9 张/,'failed previews retry');
  const oldSameCounts=ctx.refreshSplitPreview(true),newSameCounts=ctx.refreshSplitPreview(true);

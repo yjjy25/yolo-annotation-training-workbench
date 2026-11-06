@@ -79,7 +79,7 @@ def test_checked_snapshot_rejects_tampering_and_wrong_training_input(tmp_path):
     assert checked_configuration(path,tmp_path,1,64)["checks"]["backward"]
     with pytest.raises(ValueError): checked_configuration(path,tmp_path,1,128)
     from pathlib import Path
-    Path(path).write_text(Path(path).read_text()+"\n# external modification\n")
+    Path(path).write_text(Path(path).read_text(encoding="utf-8")+"\n# external modification\n", encoding="utf-8")
     with pytest.raises(ValueError,match="变化"): checked_configuration(path,tmp_path,1,64)
 
 
@@ -238,4 +238,16 @@ def test_checked_eval_io_is_not_overwritten_by_training_check(tmp_path):
     result=run(tmp_path,dict(template="yolov8n",nc=1,imgsz=64,seed=42,edits=[],action="check"))
     assert result["shapes"]["model.0.conv"]["output"][0]==1
     assert result["training_shapes"]["model.0.conv"]["output"][0]==2
+
+
+def test_nested_container_measurements_show_repeated_blocks_without_inventing_list_io(tmp_path):
+    result = run(tmp_path, dict(template="yolov8n", nc=1, imgsz=64, seed=42, edits=[], action="inspect"))
+    shapes = result["shapes"]
+    for index in (0, 1):
+        path = f"model.4.m.{index}"
+        assert shapes[path]["input"][0] == [1, 32, 8, 8]
+        assert shapes[path]["output"] == [1, 32, 8, 8]
+        assert shapes[path + ".cv1"]["output"] == [1, 32, 8, 8]
+    assert "model.4.m" not in shapes  # ModuleList is iterated, never called.
+    assert shapes["model.4"]["output"] == [1, 64, 8, 8]
     assert result["execution"]["input"]==[1,3,64,64]

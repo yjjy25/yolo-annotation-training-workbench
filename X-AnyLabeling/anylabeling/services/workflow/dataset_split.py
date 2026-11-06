@@ -204,7 +204,7 @@ def _group_images(project, records, cache, warnings):
             buckets[key].append(name)
     cache["verified_pairs"] = verified
     if truncated:
-        warnings.append("相似图候选达到搜索上限；已知同源与完全重复仍整组划分，但视觉近重复扫描不是穷尽检查。")
+        warnings.append("近重复检查达到搜索上限，部分相似图片可能未识别。")
 
     components = defaultdict(list)
     for name in records:
@@ -283,7 +283,7 @@ def create_plan(project, options=None):
     if not isinstance(previous, dict):
         previous = {}
     previous = {key: value for key, value in previous.items() if value in ("train", "val")}
-    recompute = bool(previous) and bool(options) and settings != frozen.get("settings")
+    recompute = bool(previous) and bool(options) and settings != project.split_settings(frozen.get("settings"))
     cache_path = project.root / ".cache" / "split-fingerprints.json"
     try:
         cache = read_json(cache_path) if cache_path.exists() else {}
@@ -308,10 +308,16 @@ def create_plan(project, options=None):
             if fp is None:
                 fp = _fingerprint(image)
             current_cache[image.name] = {"stat": stat, "fingerprint": fp}
-            records[image.name] = {"annotation": annotation, "label_sha256": digest(label), "fingerprint": fp}
+            records[image.name] = {"annotation": annotation, "label_sha256": digest(label), "fingerprint": fp,
+                                   "split_key": fp["sha256"] if settings["grouped"] else "image:" + image.name}
         except (OSError, ValueError) as error:
             errors.append(f"{image.name} 无法解码或读取：{error}")
-    groups = _group_images(project, records, cache, warnings)
+    if settings["grouped"]:
+        groups = _group_images(project, records, cache, warnings)
+    else:
+        groups = [{"id": "image-" + _stable(name)[:20], "members": [name],
+                   "reasons": ["individual-image"], "sources": [], "evidence": []}
+                  for name in records]
     cache["images"] = current_cache
     if cache != {"version": VERSION}:
         try:
@@ -329,17 +335,18 @@ def create_plan(project, options=None):
     if errors:
         reason = "；".join(errors)
     elif len(groups) < 2:
-        reason = "至少需要两个独立来源组。当前已审核图片属于同一视频或相同/近重复内容；请增加另一独立视频或图片来源，不能拆开同组来建立验证集。"
+        reason = ("整组划分至少需要两个独立来源组；请补充其他来源图片，或关闭整组划分。"
+                  if settings["grouped"] else "至少需要 2 张已审核图片才能划分训练集与验证集。")
     if previous and not recompute:
         conflicts = []
         for group in groups:
-            parts = {previous[records[n]["fingerprint"]["sha256"]] for n in group["members"]
-                     if records[n]["fingerprint"]["sha256"] in previous}
+            parts = {previous[records[n]["split_key"]] for n in group["members"]
+                     if records[n]["split_key"] in previous}
             if len(parts) > 1:
                 conflicts.append(group["id"])
             part = next(iter(parts)) if len(parts) == 1 else "train"
             for name in group["members"]:
-                assignments[records[name]["fingerprint"]["sha256"]] = part
+                assignments[records[name]["split_key"]] = part
         if conflicts:
             reason = (f"检测到 {len(conflicts)} 个来源/相似组跨越旧训练集与验证集（可能由新增帧连接旧分组）。"
                       "为避免泄漏已停止构建；请调整划分比例/数量/种子后重新划分。旧数据集与原图标注保持不变。")
@@ -348,17 +355,17 @@ def create_plan(project, options=None):
         for group in groups:
             part = "val" if group["id"] in validation else "train"
             for name in group["members"]:
-                assignments[records[name]["fingerprint"]["sha256"]] = part
+                assignments[records[name]["split_key"]] = part
     for group in groups:
         for name in group["members"]:
-            assignments.setdefault(records[name]["fingerprint"]["sha256"], "train")
-    validation_count = sum(assignments[r["fingerprint"]["sha256"]] == "val" for r in records.values())
+            assignments.setdefault(records[name]["split_key"], "train")
+    validation_count = sum(assignments[r["split_key"]] == "val" for r in records.values())
     if not reason and not 0 < validation_count < total:
         reason = "当前已审核数据未覆盖固定训练集和验证集，请补审对应图片，或调整划分比例/数量/种子重新划分。"
     if validation_count != target and not reason:
-        warnings.append(f"目标验证 {target} 张，实际 {validation_count} 张；整组保护或已有固定划分会使实际数量偏离目标。")
+        warnings.append(f"验证集目标 {target} 张，实际 {validation_count} 张（{'整组划分或沿用已有划分' if settings['grouped'] else '沿用已有划分'}）。")
     if previous and recompute:
-        warnings.append("本次参数已改变，将建立新的分组划分；已有数据集快照保持不变，新旧划分的实验结果不能直接归因于模型改动。")
+        warnings.append("划分设置已改变，下次训练将使用新划分。")
     revision = _stable({"images": {n: [r["fingerprint"]["sha256"], r["label_sha256"]] for n, r in records.items()},
                         "groups": groups, "settings": settings, "assignments": assignments})
     preview = {"settings": settings, "images": total, "unique": len({r["fingerprint"]["sha256"] for r in records.values()}),
@@ -367,7 +374,9 @@ def create_plan(project, options=None):
                "similar_groups": sum(any(r in {"identical-file", "identical-pixels", "verified-near-pixels"} for r in g["reasons"]) for g in groups),
                "target_val": target, "actual_ratio": round(100 * validation_count / total, 2) if total else 0,
                "warnings": list(dict.fromkeys(warnings)), "reason": reason,
-               "algorithm": ALGORITHM, "version": VERSION, "dataset_revision": revision}
+               "algorithm": ALGORITHM if settings["grouped"] else "seeded-individual-images",
+               "version": VERSION, "dataset_revision": revision}
     return {"preview": preview, "records": records, "groups": groups, "assignments": assignments,
-            "metadata": {"algorithm": ALGORITHM, "version": VERSION, "policy": POLICY,
+            "metadata": {"algorithm": preview["algorithm"], "version": VERSION,
+                         "policy": POLICY if settings["grouped"] else {"selection": "seeded individual images"},
                          "groups": groups, "dataset_revision": revision, "summary": preview}}

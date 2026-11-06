@@ -23,9 +23,15 @@ def checksum(stream):
 
 def source_files():
     files = {}
-    for p in (ROOT/'desktop').iterdir():
-        if p.is_file() and p.suffix in {'.cjs','.js','.html','.css','.json','.svg','.png','.ico'} and p.name != 'package-lock.json':
-            files['resources/app/'+p.name] = p
+    # Ship the whole renderer folder, including helper subdirectories such as
+    # desktop/maixcam/maixcam_server.py that the capture page opens by path.
+    for base, dirs, names in os.walk(ROOT/'desktop'):
+        dirs[:] = [d for d in dirs if d not in {'node_modules','__pycache__'} and not d.startswith('.')]
+        for name in names:
+            p = Path(base)/name
+            if name == 'package-lock.json' or p.suffix not in {'.cjs','.js','.html','.css','.json','.svg','.png','.ico','.py'}:
+                continue
+            files['resources/app/'+p.relative_to(ROOT/'desktop').as_posix()] = p
     excluded = {'.git','__pycache__','.pytest_cache','.ruff_cache','node_modules','runs','dist','build','.venv','.runtime'}
     for base, dirs, names in os.walk(ROOT/'X-AnyLabeling'):
         dirs[:] = [d for d in dirs if d not in excluded and not d.endswith('.egg-info')]
@@ -36,7 +42,7 @@ def source_files():
     files['resources/workbench/.runtime/launcher.pyw'] = ROOT/'.runtime/launcher.pyw'
     for p in (ROOT/'.runtime/fonts').iterdir():
         if p.is_file(): files['resources/workbench/.runtime/fonts/'+p.name] = p
-    files['使用说明.md'] = ROOT/'文档/v0.6_安装说明.md'
+    files['使用说明.md'] = ROOT/'文档/v0.7_安装说明.md'
     files['SOURCE-LICENSE-GPL3.txt'] = ROOT/'X-AnyLabeling/LICENSE'
     return files
 

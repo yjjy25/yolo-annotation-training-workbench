@@ -36,3 +36,11 @@ Thumbs.db
 
 # Public runtime source URLs and checksums used to rebuild v0.6 installers
 !.packaging/base-runtime-v0.5.2.json
+
+# Generated model revisions and probe output from manual compatibility runs
+X-AnyLabeling/tests/workflow/model_designs/
+X-AnyLabeling/tests/workflow/sizes.json
+
+# Local editor/agent scratch space and promotional media, never part of a release
+.workbuddy/
+宣传视频/

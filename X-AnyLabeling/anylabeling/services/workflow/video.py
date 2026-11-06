@@ -24,6 +24,16 @@ def options(args):
     return {**values, "limit": limit}
 
 
+def encode_frame(image, suffix=".png"):
+    """Preserve decoded pixels for new frames; retain legacy JPEG sessions."""
+    import cv2
+    parameters = [cv2.IMWRITE_PNG_COMPRESSION, 3] if suffix == ".png" else [cv2.IMWRITE_JPEG_QUALITY, 95]
+    ok, encoded = cv2.imencode(suffix, image, parameters)
+    if not ok:
+        raise ValueError("视频帧编码失败。")
+    return encoded
+
+
 def import_video(project, args, report, cancelled=lambda: False):
     import cv2
 
@@ -49,7 +59,8 @@ def import_video(project, args, report, cancelled=lambda: False):
         frames = []
         metadata = {"id": identifier, "source": str(source), "source_name": source.name,
                     "source_bytes": source.stat().st_size, "source_mtime_ns": source.stat().st_mtime_ns,
-                    "fps": fps, "source_frames": total, "settings": settings, "frames": frames}
+                    "fps": fps, "source_frames": total, "settings": settings, "frames": frames,
+                    "image_format": "png"}
         index = 0
         # Decode sequentially: arbitrary codec seek often lands on a keyframe.
         while (stop is None or index < stop) and len(frames) < settings["limit"]:
@@ -62,10 +73,9 @@ def import_video(project, args, report, cancelled=lambda: False):
                 ok, frame = capture.retrieve()
                 if not ok:
                     raise ValueError(f"第 {index} 帧解码失败，未导入本批次。")
-                ok, encoded = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
-                if not ok:
-                    raise ValueError("视频帧编码失败。")
-                name = f"{identifier}_{index:09d}.jpg"
+                encoded = encode_frame(frame)
+                metadata["width"], metadata["height"] = frame.shape[1], frame.shape[0]
+                name = f"{identifier}_{index:09d}.png"
                 encoded.tofile(str(stage / name))
                 frames.append({"name": name, "frame": index, "seconds": index / fps})
                 if len(frames) == 1 or len(frames) % 10 == 0:

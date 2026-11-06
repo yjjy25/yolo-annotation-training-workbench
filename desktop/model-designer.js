@@ -3,7 +3,7 @@
  const el=id=>document.getElementById('design-'+id);
  let report=null,previousReport=null,checked=null,owner=null,busy=false,generation=0,measurementReady=false,autoTimer=null,modelSession=false;
  const cancelAuto=()=>{clearTimeout(autoTimer);autoTimer=null;};
- function invalidateMeasurement(message){measurementReady=false;clearCheck();el('graph').parentElement.setAttribute('aria-busy','true');el('block-info').textContent=message;el('params').textContent=message;el('navigation').disabled=true;el('readonly-operators').querySelectorAll('button').forEach(button=>button.disabled=true);el('apply').disabled=true;status(message);}
+ function invalidateMeasurement(message){measurementReady=false;el('space-expand').disabled=el('space-up').disabled=el('space-overview').disabled=true;el('layer-tree').hidden=true;clearCheck();el('input-shape').textContent=el('output-shape').textContent='待重新实测';el('measurement-note').textContent=message;localView.clear();spaceView.clear();el('graph').parentElement.setAttribute('aria-busy','true');el('block-info').textContent=message;el('params').textContent=message;el('navigation').disabled=true;el('readonly-operators').querySelectorAll('button').forEach(button=>button.disabled=true);el('apply').disabled=true;status(message);}
  const edits=new Map(),history=[];
  const status=text=>{el('status').textContent=text;};
  function options(select,entries){select.replaceChildren();for(const [value,label] of entries){const o=document.createElement('option');o.value=value;o.textContent=label;select.append(o);}}
@@ -25,14 +25,19 @@
  }
  function clearCheck(){checked=null;el('train').disabled=true;el('revision').textContent='尚未保存检查通过的修订';}
  function currentProject(){return state.project?.root;}
- function reset(){if(owner!==currentProject())modelSession=false;cancelAuto();measurementReady=false;previousReport=null;report=null;owner=currentProject();edits.clear();history.length=0;clearCheck();el('graph').replaceChildren();graphView.selected=-1;graphView.plan=null;graphView.zoom=1;el('graph').parentElement.scrollTo(0,0);el('selection').textContent='加载结构后，点击模块查看输入与流向。';el('stages').replaceChildren();el('layers').replaceChildren();el('operators').replaceChildren();for(const id of ['branches','scales','groups','readonly-operators'])el(id).replaceChildren();for(const id of ['head-guide','head-branches','head-modes','head-scales'])el(id).hidden=true;el('navigation').disabled=true;el('module-intro').textContent='先加载模型，再从左侧选择一个模块。';el('operator-purpose').textContent='不确定怎么改时，可以保持原值，先了解它的作用。';el('edit-help').textContent='选择上方内容后，这里会显示当前值和修改说明。';el('module-title').closest('.design-inspector').classList.remove('is-detection');el('module-title').textContent='选择一个模块';el('params').textContent='';el('block-info').textContent='';el('block-source').textContent='';el('pending').textContent='选择算子后修改参数。';el('apply').disabled=true;el('initialize').disabled=true;el('value').disabled=true;el('operator-name').textContent='选择算子查看中文说明';el('operator-id').textContent='';el('path-meaning').replaceChildren();el('source').textContent='选择算子查看真实实现与来源哈希。';el('diff').textContent='暂无修改。';}
+ function reset(){spaceView.detailRoot=null;el('layer-tree').hidden=true;spaceView.clear();localView.clear();el('current-path').textContent='尚未选择';el('input-shape').textContent=el('output-shape').textContent='未测得';el('conflict').hidden=true;el('geometry').hidden=true;if(owner!==currentProject())modelSession=false;cancelAuto();measurementReady=false;previousReport=null;report=null;owner=currentProject();edits.clear();history.length=0;clearCheck();el('graph').replaceChildren();graphView.selected=-1;graphView.plan=null;graphView.zoom=1;el('graph').parentElement.scrollTo(0,0);el('selection').textContent='加载结构后，点击模块查看输入与流向。';el('stages').replaceChildren();el('layers').replaceChildren();el('operators').replaceChildren();for(const id of ['branches','scales','groups','readonly-operators'])el(id).replaceChildren();for(const id of ['head-guide','head-branches','head-modes','head-scales'])el(id).hidden=true;el('navigation').disabled=true;el('module-intro').textContent='先加载模型，再从左侧选择一个模块。';el('operator-purpose').textContent='不确定怎么改时，可以保持原值，先了解它的作用。';el('edit-help').textContent='选择上方内容后，这里会显示当前值和修改说明。';el('module-title').closest('.design-inspector').classList.remove('is-detection');el('module-title').textContent='选择一个模块';el('params').textContent='';el('block-info').textContent='';el('block-source').textContent='';el('pending').textContent='选择算子后修改参数。';el('apply').disabled=true;el('initialize').disabled=true;el('value').disabled=true;el('operator-name').textContent='选择算子查看中文说明';el('operator-id').textContent='';el('path-meaning').replaceChildren();el('source').textContent='选择算子查看真实实现与来源哈希。';el('diff').textContent='暂无修改。';}
  function params(){return {action:'inspect',template:el('template').value,imgsz:Number(el('size').value),seed:Number(el('seed').value),edits:[...edits.values()]};}
  async function job(action){
   if(busy)return;cancelAuto();
+  if(action==='check'){
+   const layer=report?.modified.layers.find(l=>l.id===el('layers').value);
+   if(layer?.geometry_editable){try{geometryValue(layer);}catch(error){status(error.message);return;}}
+   capturePendingEdit();
+  }
   try{await ensureCatalog();}catch(error){toast(error.message);return;}if(busy)return;
   if(!state.project||state.project.task!=='detect'){toast('请先打开目标检测项目。');return;}
   if(owner!==currentProject())reset();
-  const token=++generation,project=currentProject();busy=true;invalidateMeasurement('正在自动前向检测输入、输出，请稍候…');
+  const token=++generation,project=currentProject();busy=true;el('geometry').disabled=true;invalidateMeasurement('正在自动前向检测输入、输出，请稍候…');
   el('inspect').disabled=el('check').disabled=true;el('stop').disabled=false;
   for(const id of ['family','template','size','seed','apply','layers','value','initialize'])el(id).disabled=true;
   el('operators').querySelectorAll('button').forEach(button=>button.disabled=true);
@@ -44,6 +49,8 @@
     if(token!==generation||project!==currentProject())return;
     if(result.status==='completed'){
      previousReport=report;report=result.result;measurementReady=true;modelSession=true;render();
+     showConflicts();
+     if(report.conflicts?.length){clearCheck();status('尺寸冲突：'+report.conflicts[0].message);return;}
      if(action==='check'){
       checked=report;el('train').disabled=false;
       el('revision').textContent=`${report.revision}\n结构身份：${report.design_hash}\n配置 SHA256：${report.model_sha256}\n保存：${report.model_path}`;
@@ -58,20 +65,57 @@
   finally{busy=false;el('graph').parentElement.setAttribute('aria-busy','false');el('initialize').disabled=!report||!edits.size;el('inspect').disabled=el('check').disabled=false;el('stop').disabled=true;for(const id of ['family','template','size','seed','layers'])el(id).disabled=false;inspect();}
  }
  function render(){
+  showConflicts();
   const selected=el('layers').value;
   selectLayer(report.modified.layers.find(l=>l.id===selected)||report.modified.layers[0]);
   const rows=report.design.edits.map(edit=>{
    const original=report.baseline.layers.find(l=>l.id===edit.id);
-   const before=edit.field==='activation'?original?.params.activation:original?.params.kernel;
+   const before=edit.field==='geometry'?{kernel:original?.params.kernel,padding:original?.params.padding,stride:original?.params.stride}:edit.field==='activation'?original?.params.activation:original?.params.kernel;
    return `${edit.id}：${JSON.stringify(before)} → ${JSON.stringify(edit.value)} (${edit.field})`;
   });
   el('diff').textContent=`基线参数：${report.baseline.parameters.toLocaleString()}\n修改后参数：${report.modified.parameters.toLocaleString()}\n参数差值：${report.parameter_delta>=0?'+':''}${report.parameter_delta}\n${report.initialization}\n${rows.join('\n')||'结构未修改，适合作为编辑器无修改对照。'}`;
   draw();inspect();el('initialize').disabled=busy||!edits.size;
  }
- const graphView=new ModelGraph.View(el('graph'),node=>{
+ function chooseNode(node){
+  if(!report||!measurementReady||busy||!node)return;
   const layer=report.modified.layers.find(l=>l.id.startsWith(node.id+'.')&&l.editable)||report.modified.layers.find(l=>l.id===node.id||l.id.startsWith(node.id+'.'));
   if(layer){selectLayer(layer);inspect();el('layers').closest('.design-inspector-body').scrollTop=0;}
- });
+ }
+ const graphView=new ModelGraph.View(el('graph'),chooseNode);
+ const spaceView=new ModelSpace.View(el('space'),chooseNode),localView=new ModelSpace.View(el('local-space'),null,{local:true});
+ spaceView.onModeChange=syncDepthView;
+ el('space-expand').onclick=()=>{if(measurementReady&&!busy)spaceView.open(report?.modified.graph[graphView.selected]?.id);};
+ el('space-overview').onclick=()=>spaceView.overview();
+ el('space-up').onclick=()=>spaceView.up();
+ let viewMode='3d';
+ const activeView=()=>viewMode==='3d'?spaceView:graphView;
+ function selectNetwork(index){graphView.select(index);spaceView.select(index);syncDepthView();}
+ function syncDepthView(){
+  const node=report?.modified.graph[graphView.selected],expanded=!!spaceView.detailRoot,detail=node?ModelSpace.hierarchy(report.modified,spaceView.detailRoot||node.id,report.shapes):null;
+  el('depthbar').hidden=viewMode!=='3d';el('layer-tree').hidden=!expanded||!measurementReady;el('space-expand').disabled=!measurementReady||busy||!detail||detail.leaves.length<2;
+  el('space-overview').disabled=el('space-up').disabled=!measurementReady||busy;
+  el('space-host').closest('.design-graph-panel').classList.toggle('is-layer-view',expanded&&viewMode==='3d');
+  el('space-overview').setAttribute('aria-pressed',String(!expanded));el('space-expand').setAttribute('aria-pressed',String(expanded));
+  el('space-up').hidden=!expanded;
+  el('space-count').textContent=detail?`${detail.units.length} 组 · ${detail.leaves.length} 个算子位置 · ${detail.depth} 级嵌套`:'加载后显示实际层数';
+  el('space-caption').textContent=expanded?`${spaceView.detailRoot} ${report.modified.module_tree.find(n=>n.id===spaceView.detailRoot)?.type||''} / 内部层级`:'网络总览 / 双击模块展开';
+  el('space-key').textContent=expanded?'每块薄片对应一个真实算子；左侧树表示归属，未画内部计算连线。':'叠层表示内部算子（总览最多展示五片） · 点击选择，双击展开';
+  if(!expanded){el('layer-tree').replaceChildren();return;}
+  const tree=report.modified.module_tree.filter(n=>n.id===spaceView.detailRoot||n.id.startsWith(spaceView.detailRoot+'.')),children=new Map();
+  for(const row of tree){const parent=row.id.slice(0,row.id.lastIndexOf('.'));if(!children.has(parent))children.set(parent,[]);children.get(parent).push(row);}
+  const container=document.createDocumentFragment(),selected=el('layers').value;
+  function append(row,host){
+   const nested=children.get(row.id)||[],button=document.createElement('button');button.type='button';button.dataset.layerPath=row.id;
+   button.textContent=row.id===spaceView.detailRoot?row.type:row.id.split('.').at(-1)+'  '+row.type;button.title=row.id;
+   button.classList.toggle('selected',row.id===selected);button.setAttribute('aria-pressed',String(row.id===selected));
+   button.onclick=event=>{event.preventDefault();chooseNode(row);if(nested.length)spaceView.open(row.id);};
+   if(nested.length){const group=document.createElement('details'),summary=document.createElement('summary');group.open=selected===row.id||selected.startsWith(row.id+'.')||row.id===spaceView.detailRoot;summary.append(button);group.append(summary);for(const child of nested)append(child,group);host.append(group);}
+   else host.append(button);
+  }
+  const root=tree.find(n=>n.id===spaceView.detailRoot);if(root)append(root,container);el('layer-tree').replaceChildren(container);
+ }
+ function setView(mode){viewMode=mode;syncDepthView();el('space-host').hidden=mode!=='3d';el('graph').parentElement.hidden=mode!=='2d';for(const kind of ['3d','2d'])el('view-'+kind).setAttribute('aria-pressed',String(mode===kind));el('canvas-hint').textContent=mode==='3d'?'拖动旋转 · Shift + 拖动平移 · 滚轮缩放 · 点击选择 · 尺寸压缩显示，数值为实测':'拖动平移 · Ctrl + 滚轮缩放 · 金色连线为当前模块的上下游';requestAnimationFrame(()=>{if(mode==='3d')spaceView.paint();activeView().setZoom(activeView().zoom);});}
+ el('view-3d').onclick=()=>setView('3d');el('view-2d').onclick=()=>setView('2d');
  function selectLayer(layer){
   if(!layer)return;
   const parent=layer.id.match(/^model\.\d+/)?.[0];
@@ -89,12 +133,12 @@
   const info=[];
   if(report.measurement){const time=new Date(report.measurement.measured_at).toLocaleTimeString('zh-CN',{hour12:false});info.push(`自动实测已更新：${time} · ${report.measurement.id.slice(0,8)}`);}
   if(execution){info.push(`输入：${JSON.stringify(execution.input)}`,`输出：${JSON.stringify(execution.output)}`,`实测模式：eval，NCHW = [批量, 通道, 高, 宽]`,`逐输入张量核对连线：${execution.connections_verified?'通过':'未通过'}`);}
-  else info.push('此历史修订没有模块级实测数据，请重新加载或检查。');
-  if(previousReport){const prior=previousReport.modified.graph.find(n=>n.id===node?.id)?.execution;if(prior&&execution){const same=JSON.stringify(prior.input)===JSON.stringify(execution.input)&&JSON.stringify(prior.output)===JSON.stringify(execution.output);info.push(same?'本次重新检测后尺寸未变。激活保持形状；修改核大小时同步调整填充。':`尺寸已变化。上次输入：${JSON.stringify(prior.input)}；上次输出：${JSON.stringify(prior.output)}`);}}
+  else info.push(report.conflicts?.length?'本次未执行到此模块，输入输出尚未测得。':'此历史修订没有模块级实测数据，请重新加载或检查。');
+  if(previousReport){const prior=previousReport.modified.graph.find(n=>n.id===node?.id)?.execution;if(prior&&execution){const same=JSON.stringify(prior.input)===JSON.stringify(execution.input)&&JSON.stringify(prior.output)===JSON.stringify(execution.output);info.push(same?'本次重新检测后尺寸未变。':`尺寸已变化。上次输入：${JSON.stringify(prior.input)}；上次输出：${JSON.stringify(prior.output)}`);}}
   const liveConv=report.modified.layers.find(l=>l.id===node?.id+'.conv');if(liveConv)info.push(`当前卷积：核 ${JSON.stringify(liveConv.params.kernel)}；填充 ${JSON.stringify(liveConv.params.padding)}；步长 ${JSON.stringify(liveConv.params.stride)}；通道 ${liveConv.params.in_channels} → ${liveConv.params.out_channels}`);
   const upstream=report.design.source.upstream;if(upstream)info.push(`官方依据：${upstream.tag} · ${upstream.commit.slice(0,12)}`);
   if(node?.definition)info.push('原始模板行（修改前）：'+JSON.stringify(node.definition));
-  info.push('当前显示 YAML 顶层模块；模块内部的分支、拼接、残差不在左图展开。');
+  info.push('总览显示 YAML 顶层连接；展开可查看真实模块层级与算子，内部函数式分支请结合源码。');
   if(node?.children?.length)info.push('注册子模块（不等同执行顺序）：'+node.children.map(c=>`${ModelTerms.member(report.modified.module_tree?.find(m=>m.id===node.id)||node,c.name,c).label}（${c.name}: ${c.type}）`).join('；'));
   if(node?.type==='Detect'&&report.execution){info.push(`检测分支步长：${report.execution.detection_strides.join(' / ')}；多个尺度由同一 Detect 模块处理。`);const head=report.modified.detection;if(head)info.push(`检测头：reg_max=${head.reg_max}；DFL=${head.dfl}；一对一分支=${head.one2one?'具备':'无'}；当前推理=${head.end2end?'一对一':'一对多'}`);}
   el('block-info').textContent=info.join('\n');
@@ -136,10 +180,16 @@
    }
   }
   const visible=nav.isHead?groups.filter(g=>g.branch===active?.branch&&g.mode===active?.mode&&g.scale===active?.scale):groups;
+  options(el('unit'),visible.map(group=>{
+   const path=group.id===node.id?'本模块':group.id.slice(node.id.length+1);
+   const name=group.label.split(' / ').at(-1).replace(/^第 \d+ 项 · /,'');
+   return [group.id,`${path} · ${name}`];
+  }));el('unit').value=active?.id||'';
+  el('unit').onchange=()=>{const target=visible.find(g=>g.id===el('unit').value);if(target)choose(target.layers);};
   for(const group of visible)choice('groups','group-'+group.id,group.label,'',group.id===active?.id,()=>choose(group.layers));
   const items=active?.layers||[],editable=items.filter(l=>l.editable),readonly=items.filter(l=>!l.editable).concat(nav.other);
   for(const item of editable){
-   const title=item.editable==='activation'?'响应方式 · 激活函数':item.editable==='pool_kernel'?'汇总范围 · 池化核':'卷积范围 · 卷积核';
+   const title=item.editable==='activation'?'激活函数':item.editable==='pool_kernel'?'池化核':'卷积参数';
    const value=item.editable==='activation'?item.params.activation:Array.isArray(item.params.kernel)?item.params.kernel.join(' × '):`${item.params.kernel} × ${item.params.kernel}`;
    choice('operators','operator-'+item.id,title,value,item.id===layer.id,()=>choose([item]));
   }
@@ -151,20 +201,43 @@
  }
  function pending(){
   const layer=report?.modified.layers.find(l=>l.id===el('layers').value);if(!layer)return;
+  if(layer.geometry_editable){
+   try{
+    const value=geometryValue(layer),original=report.baseline.layers.find(l=>l.id===layer.id);
+    const changed=!ModelGeometry.same(layer.params,value)||layer.geometry_policy!==value.policy;
+    const input=report.shapes?.[layer.id]?.input?.[0],predicted=ModelGeometry.predict(input,value,layer.params.dilation);
+    el('padding').value=String(value.padding);el('stride').value=String(value.stride);
+    el('padding').disabled=el('stride').disabled=busy||value.policy==='preserve';
+    el('geometry-summary').textContent=`模板：核 ${original.params.kernel.join('×')}，填充 ${original.params.padding[0]}，步幅 ${original.params.stride[0]}。${predicted?'根据当前算子输入预计输出 '+predicted.join(' × ')+'；全网结果以重新实测为准。':'当前输入未测得，应用后重新检查。'}${report.geometry_checks?' 已校准检测步长：'+report.geometry_checks.strides.join(' / ')+'。':''}`;
+    el('pending').textContent=changed?`待应用：核 ${value.kernel}，填充 ${value.padding}，步幅 ${value.stride}`:'参数与当前结构一致。';
+    el('apply').disabled=busy||!measurementReady||!changed;
+   }catch(error){el('pending').textContent=error.message;el('apply').disabled=true;}
+   return;
+  }
   const before=layer.editable==='activation'?layer.params.activation:Array.isArray(layer.params.kernel)?layer.params.kernel[0]:layer.params.kernel;
   const value=el('value').value,changed=String(before)!==value;
   el('pending').textContent=!layer.editable?'此算子仅供观察。':changed?`待应用：${before} → ${value}${layer.editable==='activation'?'':'（核大小）'}`:'参数与当前结构一致。';
   el('apply').disabled=busy||!measurementReady||!layer.editable||!changed;
   if(changed&&layer.editable&&el('auto-measure').checked)el('pending').textContent+='；稍后自动应用并实测。';
  }
- function draw(){if(report)graphView.render(report.modified.graph,report.modified.layers,edits.keys(),report.design);}
+ function draw(){if(report){graphView.render(report.modified.graph,report.modified.layers,edits.keys(),report.design);spaceView.render(report.modified.graph,report.modified.layers,edits.keys(),report.design,report.modified,report.shapes);for(const button of el('stages').children){const section=graphView.plan.groups[Array.from(el('stages').children).indexOf(button)];button.onclick=()=>activeView().focus(section);}}}
+ function geometryValue(layer){
+  const original=report.baseline.layers.find(l=>l.id===layer.id);
+  return ModelGeometry.draft(original.params,layer.params,el('value').value,el('policy').value,el('padding').value,el('stride').value);
+ }
+ function showConflicts(){
+  const conflicts=report?.conflicts||[];el('conflict').hidden=!conflicts.length;
+  el('conflict-detail').textContent=conflicts.map(c=>`${c.path} · ${c.message}\n${c.sources?'输入来源：'+c.sources.map(x=>x===-1?'输入图片':'model.'+x).join('、')+'\n':''}${c.inputs?'实际输入：'+JSON.stringify(c.inputs)+'\n':''}${c.input_size?'检查输入：'+c.input_size+' × '+c.input_size:''}${c.measured?'\n实测步长：'+JSON.stringify(c.measured):''}\n本次修改：${report.design.edits.map(e=>e.id).join('、')}`).join('\n');
+ }
+ el('conflict-locate').onclick=()=>{const path=report?.conflicts?.[0]?.path;if(!path)return;const layer=report.modified.layers.find(l=>l.id===path||l.id.startsWith(path+'.'));if(layer){selectLayer(layer);inspect();}const index=Number(path.match(/^model\.(\d+)/)?.[1]);if(Number.isInteger(index))selectNetwork(index);};
  function inspect(){
   cancelAuto();
   if(!report)return;if(!measurementReady)return;const layer=report.modified.layers.find(l=>l.id===el('layers').value);if(!layer)return;operatorButtons(layer);
   const meaning=ModelTerms.explain(layer,report.modified);el('operator-name').textContent=layer.editable==='activation'?'响应方式：决定特征值怎样通过':layer.editable==='pool_kernel'?'汇总范围：一次汇总多大的区域':layer.editable?'卷积范围：一次查看多大的区域':meaning.steps.at(-1).label+' · 只读';el('operator-id').textContent=layer.id+' · '+layer.type;el('path-meaning').replaceChildren();
   el('operator-purpose').textContent=layer.editable==='activation'?'激活函数变换特征值，帮助模型表达复杂关系。这里只调整当前一处。':layer.editable==='pool_kernel'?'池化把周围特征汇总到一起。范围越大，汇总的邻近位置越多。':layer.editable?'卷积核像一个小窗口。3 × 3 表示每次覆盖高、宽各 3 个特征位置。':meaning.steps.at(-1).detail;
   for(const step of meaning.steps){const li=document.createElement('li'),name=document.createElement('strong'),detail=document.createElement('span');name.textContent=step.key+'：'+step.label;detail.textContent=step.detail;li.append(name,detail);el('path-meaning').append(li);}
-  const parent=layer.id.match(/^model\.(\d+)/);if(parent)graphView.select(Number(parent[1]));
+  const parent=layer.id.match(/^model\.(\d+)/);if(parent){spaceView.focusedPath=layer.id;selectNetwork(Number(parent[1]));}
+  currentIO(layer);
   const labels={kernel:layer.editable==='pool_kernel'?'池化核大小':'卷积核大小',in_channels:'输入通道数',out_channels:'输出通道数',stride:'步长',groups:'卷积分组数',padding:'边缘填充',activation:'激活函数'};
   const format=value=>Array.isArray(value)?value.map(format).join(' × '):String(value);
   const lines=Object.entries(layer.params).map(([key,value])=>`${labels[key]||key}：${format(value)}`);
@@ -180,22 +253,53 @@
   el('field').textContent=layer.editable==='activation'?'激活函数':layer.editable==='pool_kernel'?'池化核大小':layer.editable?'核大小':'此算子只读';
   options(el('value'),layer.editable==='activation'?[['SiLU','SiLU · 平滑调节'],['ReLU','ReLU · 负值归零'],['LeakyReLU','LeakyReLU · 保留少量负值'],['GELU','GELU · 平滑调节'],['Identity','Identity · 直接通过']]:[1,3,5,7].map(x=>[x,x+' × '+x]));
   el('edit-help').textContent=!layer.editable?'这是只读组件。请在上方选择“卷积范围”或“响应方式”进行修改。':layer.editable==='activation'?'切换这里只改变当前一处的响应方式，不改变特征图尺寸。不同函数的识别效果需要训练后比较。':layer.editable==='pool_kernel'?'修改周围信息的汇总范围；共享池化会影响它的每次调用。工具会保持输出尺寸。':'范围越大，计算量通常越多。工具会保持输出尺寸；识别效果需训练后比较。';
+  el('geometry').hidden=!layer.geometry_editable;el('geometry').disabled=busy;
+  if(layer.geometry_editable){el('policy').value=layer.geometry_policy||'preserve';el('padding').value=String(layer.params.padding[0]);el('stride').value=String(layer.params.stride[0]);el('edit-help').textContent='保持模式随核大小计算填充；手动模式独立设置填充和步幅，并重新检查下游尺寸。';}
   const value=layer.editable==='activation'?layer.params.activation:Array.isArray(layer.params.kernel)?layer.params.kernel[0]:layer.params.kernel;
   el('value').value=String(value);el('value').disabled=!layer.editable||busy;pending();
  }
- el('zoom').onchange=()=>el('zoom').value==='fit'?graphView.fit():graphView.setZoom(Number(el('zoom').value)/100);
- el('zoom-in').onclick=()=>graphView.setZoom(graphView.zoom+.25);
- el('zoom-out').onclick=()=>graphView.setZoom(graphView.zoom-.25);
- el('all-paths').onclick=()=>graphView.select(-1);
+ function currentIO(layer){
+  const sample=report.shapes?.[layer.id],node=report.modified.graph.find(n=>n.id===layer.id);
+  const shared=sample?.shared_calls_ref,entry=shared?null:sample;
+  const input=entry?.input??node?.execution?.input,output=entry?.output??node?.execution?.output;
+  el('input-shape').textContent=ModelSpace.summary(input);el('output-shape').textContent=ModelSpace.summary(output);
+  el('input-shape').title='NCHW：'+JSON.stringify(input??null);el('output-shape').title='NCHW：'+JSON.stringify(output??null);
+  const parts=layer.id.split('.'),top=report.modified.graph[Number(parts[1])];
+  el('current-path').textContent=`${parts.slice(0,2).join('.')} ${top?.type||''}${parts.length>2?'  ›  '+parts.slice(2).join(' › '):''}`;
+  el('current-path').title=layer.id;
+  const time=report.measurement?.measured_at?new Date(report.measurement.measured_at).toLocaleTimeString('zh-CN',{hour12:false}):'';
+  const a=ModelSpace.tensors(input),b=ModelSpace.tensors(output),batch=a[0]?.[0];
+  el('measurement-note').textContent=shared?'共享算子调用暂未对应到此路径，尺寸未确认。':a.length&&b.length?`当前算子实测${time?' '+time:''} · ${batch?'批量 '+batch:''}${a.length>1?' · '+a.length+' 路输入':''}`:report.conflicts?.length?'本次检查未执行到此算子，尺寸未测得。':'当前算子尺寸未测得，请重新加载结构。';
+  localView.localPair(input,output,layer.id);
+ }
+ el('zoom').onchange=()=>el('zoom').value==='fit'?activeView().fit():activeView().setZoom(Number(el('zoom').value)/100);
+ el('zoom-in').onclick=()=>activeView().setZoom(activeView().zoom+.25);
+ el('zoom-out').onclick=()=>activeView().setZoom(activeView().zoom-.25);
+ el('all-paths').onclick=()=>{selectNetwork(-1);activeView().fit();};
  function expandEditor(expanded){const panel=el('graph').closest('.design-grid');panel.classList.toggle('design-expanded',expanded);el('fullscreen').textContent=expanded?'收起编辑区':'全屏编辑';el('fullscreen').setAttribute('aria-pressed',String(expanded));}
  el('fullscreen').onclick=()=>expandEditor(!el('graph').closest('.design-grid').classList.contains('design-expanded'));
  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!document.querySelector('dialog[open]'))expandEditor(false);});
  api.onState(()=>{if(document.getElementById('page-design').hidden)expandEditor(false);});
- el('inspect').onclick=()=>job('inspect');el('check').onclick=()=>job('check');el('layers').onchange=inspect;el('value').onchange=()=>{cancelAuto();pending();if(!el('auto-measure').checked||el('apply').disabled)return;const id=el('layers').value,value=el('value').value,project=currentProject();autoTimer=setTimeout(()=>{if(!busy&&currentProject()===project&&el('layers').value===id&&el('value').value===value)el('apply').click();},650);};
+ el('inspect').onclick=()=>job('inspect');el('check').onclick=()=>job('check');el('layers').onchange=inspect;el('value').onchange=()=>{cancelAuto();clearCheck();pending();if(!el('auto-measure').checked||el('apply').disabled)return;const id=el('layers').value,value=el('value').value,project=currentProject();autoTimer=setTimeout(()=>{if(!busy&&currentProject()===project&&el('layers').value===id&&el('value').value===value)el('apply').click();},650);};
  el('auto-measure').onchange=()=>{cancelAuto();if(report&&!measurementReady&&el('auto-measure').checked)inputConfiguration();else pending();};
+ function geometryChanged(){
+  if(busy)return;cancelAuto();clearCheck();pending();
+  if(!el('auto-measure').checked||el('apply').disabled)return;
+  const project=currentProject(),id=el('layers').value;
+  autoTimer=setTimeout(()=>{if(!busy&&currentProject()===project&&el('layers').value===id)el('apply').click();},650);
+ }
+ for(const id of ['policy','padding','stride'])el(id).onchange=geometryChanged;
+ el('padding').oninput=()=>{cancelAuto();clearCheck();pending();};
  function capturePendingEdit(){
   if(!measurementReady)return false;
   const layer=report?.modified.layers.find(l=>l.id===el('layers').value);if(!layer?.editable)return false;
+  if(layer.geometry_editable){
+   let value;try{value=geometryValue(layer);}catch(error){status(error.message);return false;}
+   if(ModelGeometry.same(layer.params,value)&&layer.geometry_policy===value.policy)return false;
+   history.push([...edits.entries()]);const original=report.baseline.layers.find(l=>l.id===layer.id);
+   if(ModelGeometry.same(original.params,value)&&value.policy==='preserve')edits.delete(layer.id);
+   else edits.set(layer.id,{id:layer.id,field:'geometry',value});return true;
+  }
   const value=layer.editable==='activation'?el('value').value:Number(el('value').value),current=layer.editable==='activation'?layer.params.activation:Array.isArray(layer.params.kernel)?layer.params.kernel[0]:layer.params.kernel;
   if(value===current)return false;
   history.push([...edits.entries()]);const original=report.baseline.layers.find(l=>l.id===layer.id),base=layer.editable==='activation'?original.params.activation:Array.isArray(original.params.kernel)?original.params.kernel[0]:original.params.kernel;

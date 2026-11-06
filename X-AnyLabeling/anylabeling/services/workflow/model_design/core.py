@@ -48,7 +48,7 @@ def template_config(name, nc):
     implementations = {name: hashlib.sha256((package/name).read_bytes()).hexdigest()
                        for name in ("nn/tasks.py", "nn/modules/conv.py", "nn/modules/block.py", "nn/modules/head.py")}
     compiler = {name: hashlib.sha256(Path(__file__).with_name(name).read_bytes()).hexdigest()
-                for name in ("core.py", "training.py", "worker.py", "reference.py")}
+                for name in ("core.py", "training.py", "worker.py", "reference.py", "geometry.py")}
     return cfg, {"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
                  "upstream": upstream, "ultralytics": ultralytics.__version__, "torch": str(torch.__version__),
                  "implementations": implementations, "compiler": compiler}
@@ -60,7 +60,7 @@ def describe(module, path):
     if isinstance(module, nn.Conv2d):
         params = {"kernel": list(module.kernel_size), "in_channels": module.in_channels,
                   "out_channels": module.out_channels, "stride": list(module.stride),
-                  "groups": module.groups, "padding": list(module.padding)}
+                  "groups": module.groups, "padding": list(module.padding), "dilation": list(module.dilation)}
         if module.weight.requires_grad and module.kernel_size[0] == module.kernel_size[1] and module.kernel_size[0] % 2:
             editable = "kernel"
     elif isinstance(module, (nn.MaxPool2d, nn.AvgPool2d)):
@@ -102,7 +102,10 @@ def validate_design(design):
         if not isinstance(edit["id"], str) or edit["id"] in seen:
             raise ValueError("算子标识无效或重复。")
         seen.add(edit["id"])
-        if edit["field"] == "activation":
+        if edit["field"] == "geometry":
+            from .geometry import validate
+            validate(edit["value"])
+        elif edit["field"] == "activation":
             if edit["value"] not in ACTIVATIONS:
                 raise ValueError("不支持的激活函数。")
         elif edit["field"] in {"kernel", "pool_kernel"}:
@@ -128,6 +131,23 @@ def build(design):
         for edit in design["edits"]:
             path, field, value = edit["id"], edit["field"], edit["value"]
             old = modules.get(path)
+            from .geometry import supported, effective_padding, calibrate, GeometryConflict
+            if field == "geometry":
+                if not supported(design["template"], path, old):
+                    raise ValueError(f"{path}：此模板或内部层尚未开放填充/步幅编辑。")
+                value = edit["value"]
+                padding = effective_padding(old, value)
+                if (old.kernel_size == (value["kernel"],) * 2 and old.padding == (padding,) * 2
+                        and old.stride == (value["stride"],) * 2):
+                    continue
+                new = nn.Conv2d(old.in_channels, old.out_channels, value["kernel"], value["stride"], padding,
+                                old.dilation, old.groups, old.bias is not None, old.padding_mode)
+                # Geometry alone does not require discarding compatible initialized weights.
+                if new.weight.shape == old.weight.shape:
+                    new.load_state_dict(old.state_dict(), strict=True)
+                parent, attr = path.rsplit(".", 1)
+                setattr(model.get_submodule(parent), attr, new)
+                continue
             if old is None or describe(old, path)["editable"] != field:
                 raise ValueError(f"{path}：不支持该参数修改。")
             if (field == "kernel" and old.kernel_size == (value, value)) or (field == "pool_kernel" and old.kernel_size == value) or (field == "activation" and type(old).__name__ == value):
@@ -150,6 +170,12 @@ def build(design):
             parent, attr = path.rsplit(".", 1)
             setattr(model.get_submodule(parent), attr, new)
         model.yaml["workbench_design"] = copy.deepcopy(design)
+        if any(edit["field"] == "geometry" for edit in design["edits"]):
+            try:
+                calibrate(model, design)
+            except GeometryConflict as error:
+                error.model = model
+                raise
     return model
 
 
@@ -160,6 +186,13 @@ def signature(model):
 
 def inspect_model(model):
     layers = [describe(m, p) for p, m in model.named_modules(remove_duplicate=False) if p and not list(m.children())]
+    from .geometry import supported
+    design = model.yaml.get("workbench_design", {})
+    for layer in layers:
+        layer["geometry_editable"] = supported(design.get("template"), layer["id"], model.get_submodule(layer["id"]))
+        if layer["geometry_editable"]:
+            layer["geometry_policy"] = next((e["value"]["policy"] for e in design.get("edits", [])
+                if e["id"] == layer["id"] and e["field"] == "geometry"), "preserve")
     definitions = model.yaml["backbone"] + model.yaml["head"]
     graph = [{"definition": definitions[i], "id": f"model.{i}", "type": type(m).__name__, "from": m.f,
               "parameters": sum(p.numel() for p in m.parameters()),
@@ -248,7 +281,17 @@ def trace_model(model, imgsz):
         return callback
 
     def leave(module, args, output):
-        parents.pop()
+        # Containers (C2f, repeated Bottlenecks, Conv wrappers) have their own
+        # real IO; never infer it from the first/last registered child.
+        path = parents.pop()
+        sample = {"input": shape(args), "output": shape(output), "mode": "eval"}
+        previous = operators.get(path)
+        if previous is None:
+            operators[path] = sample
+        elif "calls" in previous:
+            previous["calls"].append(sample)
+        else:
+            operators[path] = {"calls": [previous, sample], "mode": "eval"}
 
     try:
         leaves, containers = {}, {}
@@ -290,6 +333,8 @@ def checked_configuration(path, root, nc, imgsz):
         raise ValueError("类别数或训练尺寸与检查修订不同，请重新检查设计。")
     if not all(report.get("checks", {}).get(k) is True for k in ("forward", "backward")):
         raise ValueError("此设计未通过前向及反向检查。")
+    if any(e["field"] == "geometry" for e in design["edits"]) and not report.get("geometry_checks"):
+        raise ValueError("几何修改缺少检测步长校准，请重新检查。")
     _, source = template_config(design["template"], nc)
     if any(design["source"].get(k) != source[k] for k in ("sha256", "ultralytics", "torch", "implementations", "compiler", "upstream")):
         raise ValueError("运行库或模板已变化，请重新检查。")

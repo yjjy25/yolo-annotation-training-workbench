@@ -23,12 +23,12 @@ module.exports=async({win,app,backend,request,ready,root})=>{
   for(const name of names.slice(23))await request('save_annotation',{name,annotation,base_hash:null,checked:true});
   await ev('api.state().then(update)');await ev('refreshSplitPreview()');
   await wait(()=>ev("$('#split-summary').textContent.includes('已审核 86 张')"));
-  const preview=await request('split_preview',{split_mode:'ratio',split_ratio:20,split_count:1,split_seed:42});report.preview=preview;
+  const preview=await request('split_preview',{split_mode:'ratio',split_ratio:20,split_count:1,split_seed:42,split_grouped:false});report.preview=preview;
   check('23 to 86 reviewed images invalidates preview without changing split options',await ev("$('#count-checked').textContent==='86'&&$('#split-summary').textContent.includes('已审核 86 张')"));
   check('split counts include all reviewed images',preview.train+preview.val===86);
   await ev("go('train')");await ev('refreshSplitPreview()');
-  check('training page displays train, validation and independent test counts',await ev(`$('#training-split-summary').textContent.includes('训练集 ${preview.train} 张')&&$('#training-split-summary').textContent.includes('验证集 ${preview.val} 张')&&$('#training-split-summary').textContent.includes('测试集 0 张')`));
-  await request('start_training',{model:path.join(root,'.runtime','pretrained','yolov8n.pt'),device:'cpu',epochs:1,batch:1,imgsz:64,workers:0,split_ratio:20});
+  check('training page displays train and validation counts',await ev(`$('#training-split-summary').textContent.includes('训练集 ${preview.train} 张')&&$('#training-split-summary').textContent.includes('验证集 ${preview.val} 张')`));
+  await request('start_training',{model:path.join(root,'.runtime','pretrained','yolov8n.pt'),device:'cpu',epochs:1,batch:1,imgsz:64,workers:0,split_ratio:20,split_grouped:false});
   await request('stop_training');await ev('api.state().then(update)');
   await wait(()=>ev('!!state.trainingInfo.dataset_counts'));
   report.frozen=await ev('state.trainingInfo.dataset_counts');

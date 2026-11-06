@@ -34,7 +34,9 @@ def resolve_store(project, name):
 
 
 def frame_name(record, number):
-    return f"{record['id']}_{number:09d}.jpg"
+    existing = next((frame["name"] for frame in record["frames"] if frame["frame"] == number), None)
+    suffix = "png" if record.get("image_format") == "png" else "jpg"
+    return existing or f"{record['id']}_{number:09d}.{suffix}"
 
 
 def cache_path(project, record, number):
@@ -91,8 +93,8 @@ def seek_frame(project, args):
                     if not capture.grab():raise ValueError("该视频帧无法定位。")
             ok,image=capture.read()
             if not ok:raise ValueError("该视频帧无法解码。")
-            ok,encoded=cv2.imencode('.jpg',image,[cv2.IMWRITE_JPEG_QUALITY,95])
-            if not ok:raise ValueError("视频帧编码失败。")
+            from .video import encode_frame
+            encoded=encode_frame(image,Path(name).suffix)
             with path.open('xb') as stream:stream.write(encoded.tobytes())
         finally:
             capture.release()
@@ -144,9 +146,10 @@ def accept_frame(project, args):
             return {"name":previous["name"],"count":0,"already":True}
         raise ValueError("此帧的已确认副本已被移除，请在数据集中检查。")
     stem="reviewed_"+Path(name).stem
-    target_name=stem+".jpg";number=1
+    suffix=Path(name).suffix
+    target_name=stem+suffix;number=1
     while (project.root/"images"/target_name).exists() or project.annotation(target_name).exists():
-        number+=1;target_name=f"{stem}_{number}.jpg"
+        number+=1;target_name=f"{stem}_{number}{suffix}"
     target=project.root/"images"/target_name
     with target.open('xb') as output:
         try:

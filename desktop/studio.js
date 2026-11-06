@@ -4,6 +4,7 @@ const api=window.workbench,$=s=>document.querySelector(s);
 const iconPaths={
  video:'<rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="m10 8 6 4-6 4z"/>',
  data:'<rect x="3.5" y="3.5" width="17" height="17" rx="2.5"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 3.5v17M14.5 3.5v17"/>',
+ capture:'<rect x="2.5" y="6" width="14" height="12" rx="2.5"/><circle cx="9.5" cy="12" r="3.2"/><path d="M16.5 9.5h5v8h-5z"/><path d="m16.5 9.5 2.5-2.5M19 6V4"/>',
  editor:'<rect x="3.5" y="3.5" width="17" height="17" rx="3"/><rect x="8.5" y="8.5" width="7" height="7" rx="1.5"/><path d="M3.5 7V5.5A2 2 0 0 1 5.5 3.5H7M17 3.5h1.5a2 2 0 0 1 2 2V7M20.5 17v1.5a2 2 0 0 1-2 2H17M7 20.5H5.5a2 2 0 0 1-2-2V17"/>',
  models:'<rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="m12 8.2 1 2.6 2.6 1-2.6 1-1 2.6-1-2.6-2.6-1 2.6-1z"/>',
  review:'<rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="m7 12.4 3.4 3.4L17 8.6"/>',
@@ -74,7 +75,8 @@ async function showPage(next){
   await window.videoTracking?.mount(next);
   document.querySelectorAll('main>section').forEach(section=>section.hidden=section.id!=='page-'+page);
   document.querySelectorAll('.nav-item[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===(review?'review':page)));
-  $('#crumb-page').textContent=review?'人工审查 · 待确认图片':{design:'模型结构设计',data:'数据与标注',video:'视频追踪标注','video-review':'视频待微调',editor:'标注画布',models:'模型预标注',train:'模型训练',validate:'模型验证',export:'模型转换与量化'}[page];
+  $('#crumb-page').textContent=review?'人工审查 · 待确认图片':{design:'模型结构设计',data:'数据与标注',capture:'WiFi 摄像头采集',video:'视频追踪标注','video-review':'视频待微调',editor:'标注画布',models:'模型预标注',train:'模型训练',validate:'模型验证',export:'模型转换与量化'}[page];
+  if(page==='capture')void window.maixcam?.refresh();
   if(page==='video'||page==='video-review')await window.videoTracking?.refresh();
   // The image list drives the canvas. On a fresh start it is still empty, so an
   // entry into the canvas used to leave a blank picture with an empty label list.
@@ -274,7 +276,7 @@ function update(next){
  if(page==='train'||page==='data')refreshSplitPreview();
  const info=next.training_info&&next.training_info.project===project?.root?next.training_info:{status:'idle',logs:[]};const running=['starting','training'].includes(info.status);
  state.validationInfo=next.validation_info;state.trainingInfo=info;
- $('#training-status').textContent=trainingPending?'准备已审核数据快照…':({idle:'尚未开始',starting:'正在准备环境',training:'训练中',completed:'训练完成',failed:'训练失败',stopped:'已停止'}[info.status]||info.status);
+ $('#training-status').textContent=trainingPending?'准备已审核数据快照…':({idle:'尚未开始',starting:info.initialization_message||'正在启动训练进程…',training:'训练中',completed:'训练完成',failed:'训练失败',stopped:'已停止'}[info.status]||info.status);
  $('#training-run').textContent=info.error||info.run||'';
  const used=info.dataset_counts;
  $('#training-used-split').textContent=used?`本次训练使用 · 训练集 ${used.train} 张 · 验证集 ${used.val} 张 · 测试集 ${used.test||0} 张（未划分独立测试集）`:'本次训练使用 · 开始训练后显示实际数据数量';
@@ -302,6 +304,7 @@ function update(next){
  if(previous.training_info?.status!==info.status&&info.status==='completed'){modelKey='';refreshModels();refreshTrainingResults(true);toast('训练完成，已在下方显示训练结果图。');}
  if(previous.training_info?.status!==info.status&&info.status==='failed')refreshTrainingResults();
  if(previous.validation_info?.status!==next.validation_info?.status&&next.validation_info?.status==='completed'){refreshValidationPlots();toast('验证完成，右侧显示评估指标。');}
+ window.maixcam?.sync();
 }
 function addOption(select,value,label){const option=new Option(label,value);select.add(option);return option;}
 
@@ -502,12 +505,13 @@ async function showValidationPlots(record){
 }
 
 async function refreshModels(){
+ if(!state.project)return;
  const generation=++modelGeneration,task=state.project?.task||'detect',context=JSON.stringify([state.project?.root,task]);
- const records=await api.models();if(generation!==modelGeneration||context!==JSON.stringify([state.project?.root,state.project?.task||'detect']))return;
+ const [records,catalog]=await Promise.all([api.models(),rpc('training_model_catalog')]);if(generation!==modelGeneration||context!==JSON.stringify([state.project?.root,state.project?.task||'detect']))return;
  const sameContext=modelsContext===context;modelsContext=context;
  const suffix={detect:'',segment:'-seg',pose:'-pose',obb:'-obb',classify:'-cls'}[task];
- const key=JSON.stringify([state.project?.root,task,records]);if(key===modelKey)return;modelKey=key;
- for(const id of ['#train-model','#predict-model']){const select=$(id),previous=sameContext?select.value:'',existing=[...select.options].find(o=>o.value===previous);select.replaceChildren();const customPose=task==='pose'&&state.project.template?.preset!=='coco17';if(id==='#predict-model'&&customPose){const prompt=addOption(select,'','请选择骨点匹配的本地或已训练模型');prompt.disabled=true;}else for(const base of ['yolov8n','yolov8s','yolo11n','yolo11s','yolo26n'])addOption(select,base+suffix+'.pt',base+suffix+(task==='pose'?' · 人体预训练，可用于迁移训练':' · 预训练'));for(const record of records)addOption(select,record.weights,record.name+' · 本项目模型');if(existing&&previous&&![...select.options].some(o=>o.value===previous))select.add(existing);if([...select.options].some(o=>o.value===previous))select.value=previous;}
+ const key=JSON.stringify([state.project?.root,task,records,catalog]);if(key===modelKey)return;modelKey=key;
+ for(const id of ['#train-model','#predict-model']){const select=$(id),previous=sameContext?select.value:'',existing=[...select.options].find(o=>o.value===previous);select.replaceChildren();const customPose=task==='pose'&&state.project.template?.preset!=='coco17';if(id==='#predict-model'&&customPose){const prompt=addOption(select,'','请选择骨点匹配的本地或已训练模型');prompt.disabled=true;}else for(const base of ['yolov8n','yolov8s','yolo11n','yolo11s','yolo26n'])addOption(select,base+suffix+'.pt',base+suffix+(catalog.find(item=>item.name===base+suffix+'.pt')?.local?' · 已缓存，可离线使用':' · 未缓存，需联网下载')+(task==='pose'?' · 人体预训练':''));for(const record of records)addOption(select,record.weights,record.name+' · 本项目模型');if(existing&&previous&&![...select.options].some(o=>o.value===previous))select.add(existing);if([...select.options].some(o=>o.value===previous))select.value=previous;}
  // Validation compares project models against the frozen split; only this
  // project's own trained weights make sense there.
  const validate=$('#validate-model'),kept=validate.value;
@@ -594,9 +598,9 @@ $('#text-cancel').onclick=()=>$('#text-dialog').close();
 $('#text-form').onsubmit=async e=>{e.preventDefault();try{const name=$('#text-value').value.trim();await rpc('add_class',{name});await api.state().then(update);editor.activeClass=name;$('#active-class').value=name;$('#text-dialog').close();toast('已追加类别：'+name);}catch(error){$('#text-error').textContent=error.message;}};
 $('#image-filter').onchange=()=>{paging.page=0;loadImages();};$('#image-search').oninput=()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>{paging.page=0;loadImages();},250);};$('#refresh-images').onclick=()=>{loadImages();refreshSplitPreview(true);};
 $('#prev-page').onclick=()=>{paging.page--;loadImages();};$('#next-page').onclick=()=>{paging.page++;loadImages();};$('#page-size').onchange=()=>{paging.page=0;loadImages();};$('#editor-prev').onclick=()=>navigate(-1);$('#editor-next').onclick=()=>navigate(1);
-for(const id of ['#split-mode','#split-ratio','#split-count','#split-seed'])$(id).onchange=()=>refreshSplitPreview();
+for(const id of ['#split-mode','#split-ratio','#split-count','#split-seed','#split-grouped'])$(id).onchange=()=>refreshSplitPreview();
 $('#training-split-refresh').onclick=()=>refreshSplitPreview(true);
-function splitArgs(){return {split_mode:$('#split-mode').value,split_ratio:Number($('#split-ratio').value),split_count:Number($('#split-count').value),split_seed:Number($('#split-seed').value)};}
+function splitArgs(){return {split_mode:$('#split-mode').value,split_ratio:Number($('#split-ratio').value),split_count:Number($('#split-count').value),split_seed:Number($('#split-seed').value),split_grouped:$('#split-grouped').checked};}
 // The state publisher runs about once a second, so this must stay idempotent: an
 // earlier "newest call wins" guard rejected every write because each update
 // bumped the counter while the previous response was still in flight.
@@ -607,7 +611,7 @@ function splitPreviewKey(){return JSON.stringify([state.project?.root,state.proj
 function updateTrainingStart(){
  const project=state.project,info=state.training_info&&state.training_info.project===project?.root?state.training_info:{};
  const pending=splitKey!==splitPreviewKey()||!splitResult;
- const reason=!project?'请先打开项目。':!state.ready?'等待本地引擎就绪。':pending?'正在检查分组与划分，请稍候。':!splitResult.ready?(splitResult.reason||'至少需要 2 个独立组，且训练与验证之间不能有同组冲突。'):'';
+ const reason=!project?'请先打开项目。':!state.ready?'等待本地引擎就绪。':pending?'正在计算划分，请稍候。':!splitResult.ready?(splitResult.reason||'请检查已审核图片数量和划分设置。'):'';
  $('#train-start').disabled=trainingPending||['starting','training'].includes(info.status)||!!reason;
  $('#train-start').title=reason;
 }
@@ -619,16 +623,15 @@ function showSplitPreview(text,title=''){
  updateTrainingStart();
 }
 function describeSplitPreview(preview){
- const summary=[`训练集 ${preview.train} 张`,`验证集 ${preview.val} 张`,'测试集 0 张',`已审核 ${preview.images} 张`];
- if(Number.isInteger(preview.groups))summary.push(`独立组 ${preview.groups} 组`);
+ const grouped=preview.settings?.grouped!==false;
+ const summary=[`训练集 ${preview.train} 张`,`验证集 ${preview.val} 张`,`已审核 ${preview.images} 张`];
+ if(grouped&&Number.isInteger(preview.groups))summary.push(`独立组 ${preview.groups} 组`);
  const details=[];
- if(!preview.ready)details.push(preview.reason||'至少需要 2 个独立组，且训练与验证之间不能有同组冲突。');
- if(Number.isInteger(preview.video_groups))details.push(`同源视频组 ${preview.video_groups} 组`);
- if(Number.isInteger(preview.similar_groups))details.push(`已识别近重复组 ${preview.similar_groups} 组`);
- if(Number.isInteger(preview.target_val))details.push(`验证集目标 ${preview.target_val} 张，实际 ${preview.val} 张${preview.target_val!==preview.val?'；按组划分或沿用冻结划分，实际数量可能偏离目标':''}`);
+ if(!preview.ready)details.push(preview.reason||'至少需要 2 张可用于划分的已审核图片。');
+ if(grouped&&preview.video_groups>0)details.push(`同源视频组 ${preview.video_groups} 组`);
+ if(grouped&&preview.similar_groups>0)details.push(`已识别近重复组 ${preview.similar_groups} 组`);
  for(const warning of preview.warnings||[])if(warning&&!details.includes(warning))details.push(warning);
- details.push('按当前规则分组，同源视频和已识别的重复组不跨训练/验证集；近重复检查不能覆盖所有相似场景。','未划分独立测试集；用于论文结论的测试数据需另行准备，避免参与调参。');
- return {text:(preview.ready?'':'无法开始训练 · ')+summary.join(' · '),details:details.map(text=>text.replace(/[。；]+$/,'')).join('。')+'。'};
+ return {text:(preview.ready?'':'无法开始训练 · ')+summary.join(' · '),details:details.length?details.map(text=>text.replace(/[。；]+$/,'')).join('。')+'。':''};
 }
 async function refreshSplitPreview(force=false){
  if(force===true)invalidateSplitPreview();
@@ -649,11 +652,12 @@ async function refreshSplitPreview(force=false){
  splitPending={key,promise:operation};
  try{await operation;}finally{if(splitPending?.promise===operation)splitPending=null;}
 }
-$('#training-form').onsubmit=async e=>{e.preventDefault();trainingPending=true;$('#train-start').disabled=true;$('#training-status').textContent='准备已审核数据快照…';try{await editor.save();const args={model:$('#train-model').value,device:$('#train-device').value,lr0:Number($('#train-lr0').value),optimizer:$('#train-optimizer').value,amp:$('#train-amp').checked};for(const name of ['epochs','batch','imgsz','workers','patience'])args[name]=Number($('#train-'+name).value);for(const [id,key] of [['lrf','lrf'],['weight-decay','weight_decay'],['momentum','momentum'],['iou','iou'],['confidence','conf'],['mosaic','mosaic'],['mixup','mixup'],['scale','scale'],['translate','translate'],['fliplr','fliplr'],['hsv-h','hsv_h'],['hsv-s','hsv_s'],['hsv-v','hsv_v']])args[key]=Number($('#train-'+id).value);Object.assign(args,splitArgs());await rpc('start_training',args);toast('训练已启动，使用已审核数据快照。');}catch(error){toast(error.message);}finally{trainingPending=false;api.state().then(update);}};
+$('#training-form').onsubmit=async e=>{e.preventDefault();trainingPending=true;$('#train-start').disabled=true;$('#training-status').textContent='准备已审核数据快照…';try{await editor.save();const args={model:$('#train-model').value,allow_download:$('#train-allow-download').checked,initialization:$('#train-initialization').value,device:$('#train-device').value,lr0:Number($('#train-lr0').value),optimizer:$('#train-optimizer').value,amp:$('#train-amp').checked};for(const name of ['epochs','batch','imgsz','workers','patience'])args[name]=Number($('#train-'+name).value);for(const [id,key] of [['lrf','lrf'],['weight-decay','weight_decay'],['momentum','momentum'],['iou','iou'],['confidence','conf'],['mosaic','mosaic'],['mixup','mixup'],['scale','scale'],['translate','translate'],['fliplr','fliplr'],['hsv-h','hsv_h'],['hsv-s','hsv_s'],['hsv-v','hsv_v']])args[key]=Number($('#train-'+id).value);Object.assign(args,splitArgs());await rpc('start_training',args);toast('训练任务已提交，正在加载初始权重；进度请查看训练状态和日志。');}catch(error){toast(error.message);}finally{trainingPending=false;api.state().then(update);}};
 $('#train-stop').onclick=async()=>{if(confirm('停止当前训练？已保存的检查点会保留。'))try{await rpc('stop_training');}catch(e){toast(e.message);}};
 $('#predict-form').onsubmit=async e=>{e.preventDefault();try{await editor.save();await rpc('predict',{weights:$('#predict-model').value,device:$('#predict-device').value,confidence:Number($('#predict-confidence').value),aliases:$('#predict-aliases').value});toast('已启动批量预标注，结果作为候选保存。');}catch(error){toast(error.message);}};
 $('#predict-stop').onclick=()=>rpc('stop_predict').catch(e=>toast(e.message));
 $('#predict-local').onclick=()=>localWeights('#predict-model');$('#train-local').onclick=()=>localWeights('#train-model');$('#validate-local').onclick=()=>localWeights('#validate-model');
+$('#train-initialization').onchange=()=>{const scratch=$('#train-initialization').value==='scratch';$('#train-allow-download').disabled=scratch;$('#train-local').disabled=scratch;};
 $('#refresh-models').onclick=()=>{modelKey='';refreshModels();};$('#open-results').onclick=()=>api.results();
 $('#training-clear').onclick=()=>{$('#training-log').textContent='（已清空显示，磁盘上的训练日志不受影响。）';};
 $('#training-autoscroll').onchange=()=>{if($('#training-autoscroll').checked){const logs=$('#training-log');logs.scrollTop=logs.scrollHeight;}};
@@ -734,13 +738,13 @@ const HELP={
  ]},
  split:{title:'训练 / 验证划分',body:[
   ['为什么要划分','模型只有在没见过的图片上才知道自己行不行。所以已审核的图片会被分成两部分：大部分用来“学”（训练集），留一小部分不参与学习，只用来打分（验证集）。'],
-  ['划分方式','按比例或按数量设置验证集目标。同源视频的帧、完全重复和已识别的近重复图片按整组划分，因此实际数量可能偏离目标；至少需要 2 个独立组。'],
-  ['验证集比例 %','填 20 表示目标为已审核图片的 20%，范围 5–50%。实际比例由分组大小及冻结划分决定；很多相似帧并不代表很多独立样本。'],
-  ['验证集目标数量','设置希望用于验证的图片数。系统会保留整组，不会为凑足数量将同一视频或重复组拆入训练和验证两侧。'],
+  ['划分方式','按比例或按数量设置验证集目标，默认按图片划分。可勾选整组划分，将同源视频和已识别的重复图片分在同一侧。'],
+  ['验证集比例 %','填 20 表示目标为已审核图片的 20%，范围 5–50%。开启整组划分或沿用已有划分时，实际比例可能偏离目标。'],
+  ['验证集目标数量','设置希望用于验证的图片数。开启整组划分或沿用已有划分时，实际数量可能偏离目标。'],
   ['划分随机种子','相同数据、分组规则和设置给出可重复划分。改比例、数量或种子会重新划分；重新划分后要在同一划分上重跑基线和改进模型，才能直接比较。'],
-  ['什么时候冻结','点“开始训练”时才写入 splits.json 并固定下来。之后补审图片继承同组归属，新独立组默认进入训练集。同源视频和重复组不会拆分。'],
+  ['什么时候冻结','点“开始训练”时固定划分。之后补审图片默认进入训练集；开启整组划分时继承同组归属。修改划分设置会重新划分。'],
   ['旧划分冲突','若旧划分或新增图片把同一个组连接到了训练与验证两侧，会显示冲突并阻止训练。调整划分比例、数量或种子后重新划分，并重新运行基线实验。'],
-  ['近重复检查的范围','系统会检查已知视频来源及保守的图像相似线索，但不能识别所有同一对象、场景、裁剪或增强副本。论文实验仍需按采集来源审查数据，另留不参与调参的独立测试集。']
+  ['近重复检查的范围','仅在开启整组划分时检查已知视频来源和近重复图片；相似检查不能覆盖所有场景。']
  ]},
  train:{title:'训练参数',body:[
   ['运行设备 device','cpu 用处理器，慢但不挑环境；0 用第一块 NVIDIA 显卡，快。写 0 就必须有可用的 CUDA 驱动。'],
@@ -827,7 +831,7 @@ async function refreshExportSource(){
 function renderExport(next){
  const info=next.project&&next.export_info?.project===next.project.root?next.export_info:{status:'idle',logs:[]};
  const busy=['starting','running'].includes(info.status);
- $('#export-status').textContent={idle:'尚未运行',starting:'正在准备转换',running:'正在转换 / 量化',completed:'转换完成',failed:'转换失败，请查看日志',stopped:'已停止，未完成文件请勿部署'}[info.status]||info.status;
+ $('#export-status').textContent=info.status==='completed'&&info.target==='maixcam'?'MaixCAM ONNX 检查通过，下一步到 MaixHub 量化':({idle:'尚未运行',starting:'正在准备转换',running:'正在转换 / 量化',completed:'转换完成',failed:'转换失败，请查看日志',stopped:'已停止，未完成文件请勿部署'}[info.status]||info.status);
  $('#export-output').textContent=info.output||'';
  const logs=$('#export-log'),text=(info.logs||[]).join('\n');
  if(logs.textContent!==text){logs.textContent=text;logs.scrollTop=logs.scrollHeight;}
@@ -836,16 +840,27 @@ function renderExport(next){
  $('#export-folder').disabled=!next.project;
 }
 function exportSettings(){
+ const maixcam=$('#export-mode').value==='maixcam';
+ $('#export-format').disabled=maixcam;
+ if(maixcam)$('#export-format').value='onnx';
  const torch=$('#export-format').value==='torchscript',precision=$('#export-precision');
- for(const option of precision.options)option.disabled=torch&&option.value!=='fp32';
- if(torch)precision.value='fp32';
+ for(const option of precision.options)option.disabled=(torch||maixcam)&&option.value!=='fp32';
+ if(torch||maixcam)precision.value='fp32';
+ precision.disabled=maixcam;
+ $('#export-maixcam-size').hidden=!maixcam;$('#export-square-size').hidden=maixcam;
+ $('#export-imgsz').disabled=maixcam;
+ for(const id of ['export-height','export-width']){$('#'+id).disabled=!maixcam;$('#'+id).required=maixcam;}
  const int8=precision.value==='int8';
  $('#export-calibration-fields').hidden=!int8;
  $('#export-calibration').required=int8;$('#export-calibration-limit').disabled=!int8;
  $('#export-target-info').textContent='转换目标：'+(torch?'TorchScript（.torchscript）':'ONNX（.onnx）')+' · '+precision.value.toUpperCase()+(int8?' · 需要校准图片':' · 无需校准图片');
  $('#export-hint').textContent='格式和精度要按最终运行模型的软件、设备来选。文件转换完成后，请用真实图片检查识别效果，再比较速度；模型变小不代表一定更快。';
+ if(maixcam){
+  $('#export-target-info').textContent='转换目标：MaixCAM / Pro · ONNX FP32 · '+$('#export-width').value+' × '+$('#export-height').value+'（宽 × 高） · YOLO26 检测';
+  $('#export-hint').textContent='仅支持标准 YOLO26 检测模型（保留 one2one 分支）。默认 320×224；导出后检查六个 MaixHub 节点和输入尺寸，并附使用说明、类别表。在 MaixHub 选择 YOLO26，提供 20～100 张真实校准图片完成量化，下载 .mud 与 .cvimodel。当前不包含 MaixCAM2 或其他 YOLO 系列适配。';
+ }
 }
-$('#export-format').onchange=exportSettings;$('#export-precision').onchange=exportSettings;exportSettings();
+for(const id of ['export-mode','export-format','export-precision','export-height','export-width'])$('#'+id).onchange=exportSettings;exportSettings();
 $('#export-model').onchange=()=>refreshExportSource();
 $('#export-local').onclick=async()=>{await localWeights('#export-model');refreshExportSource();};
 $('#export-choose-calibration').onclick=async()=>{const path=await api.choose('source');if(path)$('#export-calibration').value=path;};
@@ -855,7 +870,7 @@ $('#export-form').onsubmit=async event=>{
  event.preventDefault();if(exportPending)return;exportPending=true;renderExport(state);
  try{
   await editor.save();
-  await rpc('start_export',{weights:$('#export-model').value,format:$('#export-format').value,precision:$('#export-precision').value,imgsz:Number($('#export-imgsz').value),calibration:$('#export-calibration').value.trim(),calibration_limit:Number($('#export-calibration-limit').value)});
+  await rpc('start_export',{weights:$('#export-model').value,target:$('#export-mode').value,format:$('#export-format').value,precision:$('#export-precision').value,imgsz:$('#export-mode').value==='maixcam'?[Number($('#export-height').value),Number($('#export-width').value)]:Number($('#export-imgsz').value),calibration:$('#export-calibration').value.trim(),calibration_limit:Number($('#export-calibration-limit').value)});
   toast('转换已启动，输出保存在项目 exports 目录。');
  }catch(error){toast(error.message);}finally{exportPending=false;api.state().then(update);}
 };

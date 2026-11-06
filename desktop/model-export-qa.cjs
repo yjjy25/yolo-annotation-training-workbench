@@ -4,7 +4,7 @@ module.exports=async({win,app,backend,request,ready,root})=>{
  const ev=s=>win.webContents.executeJavaScript(s,true),pause=ms=>new Promise(r=>setTimeout(r,ms));
  const wait=async(fn,ms=120000)=>{const end=Date.now()+ms;while(Date.now()<end){if(await fn())return;await pause(150);}throw Error('Export UI timeout');};
  const check=(name,value)=>{assert.ok(value,name);report.checks.push(name);};
- const weights=path.join(root,'.runtime','pretrained','yolov8n.pt');
+ const weights=process.env.XAL_QA_MAIXCAM_WEIGHTS||path.join(root,'.runtime','pretrained','yolov8n.pt');
  const digest=()=>crypto.createHash('sha256').update(fs.readFileSync(weights)).digest('hex');const before=digest();
  try{
   await wait(()=>Promise.resolve(ready()));await wait(()=>ev('!!window.videoTracking'));
@@ -15,6 +15,25 @@ module.exports=async({win,app,backend,request,ready,root})=>{
   for(let i=0;i<3;i++){const data=Buffer.alloc(96*64*4);for(let p=0;p<data.length;p+=4){data[p]=(p/4+i*40)%256;data[p+1]=100;data[p+2]=150;data[p+3]=255;}fs.writeFileSync(path.join(calibration,`smoke-${i}.png`),nativeImage.createFromBitmap(data,{width:96,height:64}).toPNG());}
   await ev('api.state().then(update)');await ev("go('export')");
   check('export page visible',await ev("!$('#page-export').hidden&&$('#crumb-page').textContent==='模型转换与量化'"));
+  if(process.env.XAL_QA_MAIXCAM_WEIGHTS){
+   await ev(`addOption($('#export-model'),${JSON.stringify(weights)},'YOLO26 检测权重');$('#export-model').value=${JSON.stringify(weights)};$('#export-mode').value='maixcam';exportSettings();void 0`);
+   check('MaixCAM locks ONNX FP32 and shows rectangular input',await ev("$('#export-format').disabled&&$('#export-format').value==='onnx'&&$('#export-precision').disabled&&$('#export-precision').value==='fp32'&&!$('#export-maixcam-size').hidden&&$('#export-imgsz').disabled&&$('#export-calibration-fields').hidden"));
+   check('MaixCAM defaults to width320 height224',await ev("$('#export-width').value==='320'&&$('#export-height').value==='224'&&$('#export-hint').textContent.includes('MaixHub')"));
+   await ev("$('#export-form').requestSubmit();void 0");
+   await wait(()=>ev("['starting','running'].includes(state.export_info?.status)"));
+   await wait(()=>ev("['completed','failed'].includes(state.export_info?.status)"),240000);
+   const info=await ev('state.export_info');report.results.push(info);
+   check('MaixCAM UI export completes',info.status==='completed'&&fs.existsSync(info.output));
+   const record=JSON.parse(fs.readFileSync(path.join(info.run,'export.json'),'utf8'));
+   check('MaixCAM six node profile passed',record.maixcam_check?.status==='passed'&&Object.keys(record.maixcam_check.nodes).length===6);
+   check('MaixCAM pins one2one export parameters',record.export_args.nms===false&&record.export_args.simplify===true&&record.export_args.opset===17);
+   check('MaixCAM preserves source and writes guide and labels',record.source_sha256===before&&digest()===before&&fs.existsSync(record.guide)&&fs.existsSync(path.join(info.run,'labels.txt')));
+   check('result describes cloud quantization next step',await ev("$('#export-status').textContent.includes('MaixHub')"));
+   await pause(250);fs.writeFileSync(path.join(folder,'maixcam.png'),(await win.webContents.capturePage()).toPNG());
+   await ev("$('#export-mode').value='generic';exportSettings();void 0");
+   check('generic mode restores square and format controls',await ev("!$('#export-format').disabled&&!$('#export-precision').disabled&&!$('#export-imgsz').disabled&&$('#export-maixcam-size').hidden"));
+   fs.writeFileSync(path.join(folder,'report.json'),JSON.stringify(report,null,2));await request('prepare_exit');app.exit(0);return;
+  }
   if(process.env.XAL_QA_EXPORTHELP){
    check('long explanations removed from main page',await ev("!$('.export-explanation')&&$('#export-target-info').textContent.includes('ONNX')"));
    await ev(`addOption($('#export-model'),${JSON.stringify(weights)},'本地 YOLOv8n');$('#export-model').value=${JSON.stringify(weights)};refreshExportSource();void 0`);

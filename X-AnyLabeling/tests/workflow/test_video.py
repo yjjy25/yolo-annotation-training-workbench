@@ -37,6 +37,21 @@ def test_video_range_provenance_and_preserved_source(tmp_path, source):
     assert [f["frame"] for f in record["frames"]] == [5, 10, 15]
     assert [f["seconds"] for f in record["frames"]] == [.5, 1, 1.5]
     assert record["source"] == str(source)
+    assert record["image_format"] == "png"
+    assert (record["width"],record["height"]) == (96,64)
+    capture = cv2.VideoCapture(str(source))
+    try:
+        selected = {frame["frame"]:frame["name"] for frame in record["frames"]}
+        for number in range(16):
+            ok, decoded = capture.read()
+            assert ok
+            if number in selected:
+                path = project.root / "images" / selected[number]
+                assert path.suffix == ".png"
+                saved = cv2.imdecode(np.fromfile(path,dtype=np.uint8),cv2.IMREAD_COLOR)
+                np.testing.assert_array_equal(saved,decoded)
+    finally:
+        capture.release()
     assert len(project.images) == 3
     assert not list((project.root / "annotations").glob("*.json"))
     assert digest(source) == before
@@ -75,6 +90,16 @@ def test_invalid_video_and_empty_range_do_not_add_data(tmp_path, source):
         with pytest.raises(ValueError):
             import_video(project, args, lambda _: None)
     assert project.images == []
+
+
+def test_legacy_frame_names_remain_compatible():
+    from anylabeling.services.workflow.video_workspace import frame_name
+    record = {"id":"legacy", "frames":[{"frame":0,"name":"legacy_000000000.jpg"}]}
+    assert frame_name(record,0) == "legacy_000000000.jpg"
+    assert frame_name(record,1) == "legacy_000000001.jpg"
+    record["image_format"] = "png"
+    assert frame_name(record,0) == "legacy_000000000.jpg"
+    assert frame_name(record,1) == "legacy_000000001.png"
 
 
 def test_create_project_from_video_without_image_folder(tmp_path, source):

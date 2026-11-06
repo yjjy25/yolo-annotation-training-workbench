@@ -1,0 +1,13 @@
+const assert=require('node:assert/strict');
+const geometry=require('./model-geometry.js');
+const params={kernel:[3,3],padding:[1,1],stride:[2,2],dilation:[1,1]};
+const manual=geometry.draft(params,params,7,'manual',1,2);
+assert.deepEqual(geometry.predict([1,3,640,640],manual),[318,318]);
+const preserve=geometry.draft(params,params,7,'preserve',1,2);
+assert.deepEqual(preserve,{kernel:7,padding:3,stride:2,policy:'preserve'});
+assert.deepEqual(geometry.predict([1,3,640,640],preserve),[320,320]);
+assert.equal(geometry.same(params,manual),false);
+assert.throws(()=>geometry.draft(params,params,3,'manual',1,0));
+assert.throws(()=>geometry.draft(params,params,3,'manual',1.2,2));
+assert.throws(()=>geometry.draft(params,params,3,'manual','',2));
+console.log('Geometry: explicit manual values, preserve policy, formula and invalid-input guards passed.');

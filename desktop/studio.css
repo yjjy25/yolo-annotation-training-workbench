@@ -118,6 +118,25 @@ dialog::backdrop{backdrop-filter:blur(3px)}
 .approve-switch:hover{border-color:var(--border-strong)}
 .approve-switch input{width:auto;margin:0}
 .shape-switch{display:flex;gap:4px;margin-left:8px;padding-left:8px;border-left:1px solid var(--border)}
+
+/* ---- WiFi camera capture ---- */
+.capture-summary{display:flex;align-items:center;border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:16px 0;margin-bottom:20px;box-shadow:var(--shadow-1)}
+.capture-summary>div{padding:0 30px;border-right:1px solid var(--border)}
+.capture-summary>div:last-child{border-right:0}
+.capture-summary strong{display:block;font-size:25px;font-weight:600;font-variant-numeric:tabular-nums}
+.capture-summary span{display:block;font-size:11px;color:var(--muted);margin-top:4px}
+.capture-layout{display:grid;grid-template-columns:minmax(310px,.9fr) minmax(330px,1.1fr);gap:22px;align-items:start}
+.capture-layout .panel>.button-row{margin-top:14px}
+.capture-preview{position:relative;aspect-ratio:16/9;background:var(--canvas);border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.capture-preview img{width:100%;height:100%;object-fit:contain;display:block}
+.capture-preview>p{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;font-size:13px}
+.capture-device{min-height:18px;margin-top:10px;font-size:11px}
+.capture-guide{margin-top:22px}
+.capture-guide details>ol{padding-left:21px;margin:0;color:var(--muted);font-size:13px;line-height:1.9}
+.capture-guide details>ol li{margin-bottom:6px}
+.capture-guide code{background:var(--input);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:12px}
+.capture-guide .muted{margin-top:12px}
+@media(max-width:1200px){.capture-layout{grid-template-columns:1fr}.capture-summary>div{padding:0 18px}}
 .shape-switch button{font-size:11px;padding:5px 9px;border-radius:7px}
 .shape-switch button.selected{background:var(--tint);border-color:var(--accent);color:var(--accent);box-shadow:inset 0 0 0 1px var(--ring)}
 .dirty-notice{position:absolute;left:50%;transform:translateX(-50%);bottom:8px;z-index:5;margin:0;padding:5px 12px;border-radius:20px;background:var(--tint);color:var(--accent);font-size:11px;cursor:pointer;box-shadow:var(--shadow-1);white-space:nowrap}

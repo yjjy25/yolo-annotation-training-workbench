@@ -306,6 +306,7 @@ def test_train_runs_with_only_worker_payload_and_framework_modules(
             calls.setdefault("callbacks", {})[name] = callback
 
         def __init__(self, model):
+            assert not any(event == "training_started" for event, _ in events)
             calls["model"] = model
 
         def train(self, **kwargs):
@@ -325,6 +326,8 @@ def test_train_runs_with_only_worker_payload_and_framework_modules(
     )
     monkeypatch.chdir(tmp_path)
     weights_directory = tmp_path / "weights"
+    from anylabeling.services.workflow import training_weights
+    monkeypatch.setattr(training_weights, "download_training_weight", lambda name, directory, progress: name)
     payload = {
         "args": {
             "model": "yolo11n.pt",
@@ -347,6 +350,8 @@ def test_train_runs_with_only_worker_payload_and_framework_modules(
     for name, value in thresholds.items():
         assert calls["train"][name] == value
     assert [event for event, _data in events] == [
+        "training_initializing",
+        "training_initializing",
         "training_started",
         "training_completed",
     ]

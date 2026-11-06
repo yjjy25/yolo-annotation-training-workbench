@@ -7,7 +7,7 @@ import pytest
 
 from anylabeling.services.workflow.desktop import save_annotation
 from anylabeling.services.workflow.project import Project, digest, read_json
-from anylabeling.services.workflow.video_workspace import frame_store, seek_frame, accept_frame
+from anylabeling.services.workflow.video_workspace import frame_store, seek_frame, accept_frame, frame_name
 
 def label_path(project,name):
     return frame_store(project).annotation(name)
@@ -94,7 +94,7 @@ def test_scene_cut_pauses_on_blank_problem_frame_and_can_resume(tmp_path):
 def test_existing_future_annotation_is_preserved(tmp_path):
     project, _, record, first = setup(tmp_path)
     done = run(project, {"id": record['id'], "name": first}, lambda _: None)
-    second=record['id']+'_000000002.jpg'
+    second=frame_name(record,2)
     data=read_json(label_path(project,second))
     save_annotation(project,second,data,digest(label_path(project,second)),False)
     labels={p.name:digest(p) for p in (frame_store(project).root/'annotations').glob('*.json')}
@@ -157,14 +157,14 @@ def test_failure_between_sampled_frames_is_still_detected(tmp_path):
 def test_forward_seek_adds_no_labels_and_can_seek_past_missing_target(tmp_path):
     project, _, record, first=setup(tmp_path)
     second=advance_session(project, {'id':record['id'], 'name':first})
-    assert second['name'].endswith('000000010.jpg')
+    assert second['name'].endswith('000000010.png')
     assert not label_path(project,second['name']).exists()
     third=advance_session(project, {'id':record['id'], 'name':second['name']})
-    assert third['name'].endswith('000000020.jpg')
+    assert third['name'].endswith('000000020.png')
     assert project.counts()['total']==0
     assert frame_store(project).counts()=={'total':3,'checked':0,'draft':1}
     fourth=advance_session(project, {'id':record['id'], 'name':third['name']})
-    assert fourth['name'].endswith('000000024.jpg')
+    assert fourth['name'].endswith('000000024.png')
     with pytest.raises(ValueError, match='结尾'):
         advance_session(project, {'id':record['id'], 'name':fourth['name']})
 

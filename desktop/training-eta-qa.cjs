@@ -14,7 +14,12 @@ module.exports=async({win,app,backend,request,ready,root})=>{
   }
   await request('import_images',{paths});for(const file of paths)await request('save_annotation',{name:path.basename(file),base_hash:null,checked:true,annotation:{imageWidth:128,imageHeight:128,shapes:[{label:'object',shape_type:'rectangle',points:[[20,20],[100,20],[100,100],[20,100]],flags:{}}],flags:{}}});
   await ev('api.state().then(update)');await ev("go('train')");
-  await ev("window.__progressEvents=[];api.onState(s=>{if(s.training_info?.progress)window.__progressEvents.push(s.training_info.progress)});void 0");
+  check('training model choices show cached and missing weights',await ev("[...$('#train-model').options].some(o=>o.value==='yolov8n.pt'&&o.textContent.includes('已缓存'))&&[...$('#train-model').options].some(o=>o.value==='yolo11s.pt'&&o.textContent.includes('未缓存'))"));
+  check('missing initial weights download automatically by default',await ev("$('#train-allow-download').checked&&$('#train-initialization').value==='pretrained'"));
+  const before=fs.readdirSync(path.join(project,'datasets')).length;
+  let missing='';try{await request('start_training',{model:'yolo11s.pt',allow_download:false,device:'cpu',epochs:1,batch:2,imgsz:64});}catch(error){missing=error.message;}
+  check('missing weights fail before creating a dataset snapshot',missing.includes('尚未下载')&&fs.readdirSync(path.join(project,'datasets')).length===before);
+  await ev("window.__progressEvents=[];window.__initializationEvents=[];api.onState(s=>{if(s.training_info?.progress)window.__progressEvents.push(s.training_info.progress);if(s.training_info?.initialization_message)window.__initializationEvents.push(s.training_info.initialization_message)});void 0");
   await request('start_training',{model:path.join(root,'.runtime','pretrained','yolov8n.pt'),device:'cpu',epochs:6,batch:2,imgsz:64,workers:0,patience:0});
   await wait(()=>ev("!!state.trainingInfo?.progress&&state.trainingInfo.progress.completed>0&&state.trainingInfo.status==='training'"));
   report.live=await ev("({progress:state.trainingInfo.progress,bar:$('#training-progress-fill').style.width,text:$('#training-progress-text').textContent})");
@@ -27,6 +32,13 @@ module.exports=async({win,app,backend,request,ready,root})=>{
   check('real training completes successfully',await ev("state.trainingInfo.status==='completed'"));
   check('completion reaches 100 percent and clears estimates',await ev("$('#training-progress-fill').style.width==='100%'&&$('#training-eta').textContent===''"));
   report.final=await ev('state.trainingInfo.progress');
+  check('initialization stages are published to the UI',await ev("window.__initializationEvents.some(message=>message.includes('加载初始权重'))"));
+  const previousRun=await ev('state.trainingInfo.run');
+  await ev("$('#train-initialization').value='scratch';$('#train-initialization').dispatchEvent(new Event('change'));$('#train-model').value='yolo26n.pt';$('#train-epochs').value='1';$('#train-batch').value='2';$('#train-imgsz').value='64';$('#training-form').requestSubmit();void 0");
+  await wait(async()=>await ev(`state.trainingInfo?.run!==${JSON.stringify(previousRun)}&&['completed','failed'].includes(state.trainingInfo?.status)`));
+  check('scratch YOLO26 initializes and trains through the actual form',await ev("state.trainingInfo.status==='completed'&&window.__initializationEvents.some(message=>message.includes('生成模型结构'))"));
+  const scratchRun=await ev('state.trainingInfo.run'),scratchPayload=JSON.parse(fs.readFileSync(scratchRun+'.json','utf8'));
+  check('scratch initialization explicitly disables pretrained weights',scratchPayload.args.model==='yolo26n.yaml'&&scratchPayload.args.pretrained===false);
  }catch(error){report.errors.push(error.stack);try{fs.writeFileSync(path.join(folder,'failure.png'),(await win.webContents.capturePage()).toPNG());}catch{}}
  fs.writeFileSync(path.join(folder,'report.json'),JSON.stringify(report,null,2));try{await request('prepare_exit');}catch{}if(backend()?.exitCode===null)backend().kill();app.exit(report.errors.length?1:0);
 };

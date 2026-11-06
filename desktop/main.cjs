@@ -20,7 +20,7 @@ let current={event:'state',project:null,training:'idle',predicting:false,embedde
 let nativeDiagnostics=null;
 const diagnosticWaiters=new Map();
 const requests=new Map();
-const rpcMethods=new Set(['model_design_catalog','model_design_revisions','model_design_read','model_design_start','model_design_status','model_design_stop','create_project','open_project','load_annotation','save_annotation','add_class','mode','start_training','stop_training','predict','stop_predict','accept','start_export','stop_export','start_validation','stop_validation','model_classes','model_info','split_preview','remove_image','remove_images','export_project','import_project','project_storage','image_removal_plan','cleanup_project','restore_recycle','artifact_inventory','archive_artifacts','import_video','video_status','stop_video','video_sequences','create_tracking','start_tracking','tracking_status','advance_tracking','import_images','tracking_preview','ack_tracking_preview','seek_tracking','accept_tracking_frame','queue_tracking_review','remove_tracking_drafts']);
+const rpcMethods=new Set(['training_model_catalog','model_design_catalog','model_design_revisions','model_design_read','model_design_start','model_design_status','model_design_stop','create_project','open_project','load_annotation','save_annotation','add_class','mode','start_training','stop_training','predict','stop_predict','accept','start_export','stop_export','start_validation','stop_validation','model_classes','model_info','split_preview','remove_image','remove_images','export_project','import_project','project_storage','image_removal_plan','cleanup_project','restore_recycle','artifact_inventory','archive_artifacts','import_video','video_status','stop_video','video_sequences','create_tracking','start_tracking','tracking_status','advance_tracking','import_images','tracking_preview','ack_tracking_preview','seek_tracking','accept_tracking_frame','queue_tracking_review','remove_tracking_drafts']);
 function request(method,args={}){
   if(!ready)return Promise.reject(new Error(current.error||'本地引擎正在启动，请稍候。'));
   const request_id=require('node:crypto').randomUUID();
@@ -50,11 +50,12 @@ function recoverDraft(draft){
 async function beginQuit(){
   if(quitPending||closing)return;
   quitPending=true;
-  if(['starting','training'].includes(current.training)||current.predicting||current.native_training||current.native_exporting||['starting','running'].includes(current.export_info?.status)){
-    const answer=await dialog.showMessageBox(win,{type:'question',message:'任务仍在运行，停止任务并退出？',detail:'已有标注、训练检查点和结果会保留。',buttons:['继续工作','停止任务并退出'],defaultId:0,cancelId:0});
+  if(['starting','training'].includes(current.training)||current.predicting||current.native_training||current.native_exporting||['starting','running'].includes(current.export_info?.status)||maixcam.status().saving){
+    const answer=await dialog.showMessageBox(win,{type:'question',message:'任务仍在运行，停止任务并退出？',detail:'已有标注、训练检查点和结果会保留；未入库的采集照片会暂存，下次打开可重试入库。',buttons:['继续工作','停止任务并退出'],defaultId:0,cancelId:0});
     if(answer.response!==1){quitPending=false;return;}
   }
   log('Quit requested');
+  maixcam.shutdown();
   quitTimer=setTimeout(()=>finishQuit({}),2500);
   win.webContents.send('desktop:before-close');
 }
@@ -150,6 +151,28 @@ ipcMain.handle('desktop:rpc',async(_event,method,args={})=>{
 });
 const chooseFile=require('./file-picker.cjs').createFilePicker({dialog,getWindow:()=>win,getProject:()=>current.project,projects:path.join(packaged?RUNTIME:ROOT,'我的项目'),prefs,writePrefs});
 ipcMain.handle('desktop:choose',(_event,kind)=>chooseFile(kind));
+// MaixCAM WiFi capture lives in the main process: the renderer CSP sets
+// connect-src 'none'. Frames go back as data URLs, and photos are staged outside
+// the project before the existing import_images RPC copies them into images/,
+// so de-duplication, safe renaming and manifests stay in one place.
+const maixcamScript=path.join(__dirname,'maixcam','maixcam_server.py');
+const maixcam=require('./maixcam-capture.cjs').createMaixcamCapture({
+ staging:path.join(RUNTIME,'maixcam-staging'),
+ scriptPath:maixcamScript,
+ getProject:()=>current.project,
+ isReady:()=>ready,
+ importImages:paths=>request('import_images',{paths}),
+ emit:(type,payload)=>{if(win&&!win.isDestroyed())win.webContents.send('desktop:maixcam-event',{type,payload});},
+ log,prefs,writePrefs
+});
+ipcMain.handle('desktop:maixcam-state',()=>maixcam.status());
+ipcMain.handle('desktop:maixcam-connect',(_event,address)=>maixcam.connect({address}));
+ipcMain.handle('desktop:maixcam-disconnect',()=>maixcam.disconnect());
+ipcMain.handle('desktop:maixcam-start',(_event,interval)=>maixcam.start({interval}));
+ipcMain.handle('desktop:maixcam-stop',()=>maixcam.stop());
+ipcMain.handle('desktop:maixcam-single',()=>maixcam.single());
+ipcMain.handle('desktop:maixcam-flush',()=>maixcam.drain());
+ipcMain.handle('desktop:maixcam-folder',()=>shell.showItemInFolder(maixcamScript));
 ipcMain.handle('desktop:defaults',()=>({projects:path.join(packaged?RUNTIME:ROOT,'我的项目')}));
 ipcMain.on('desktop:native-input',(_event,data)=>{if(data&&typeof data==='object')send({...data,action:'native_input'});});
 ipcMain.on('desktop:native-view',(_event,data)=>{if(data&&typeof data==='object')send({...data,action:'native_view'});});

@@ -225,7 +225,8 @@ def test_export_hashes_match_snapshot_and_failed_export_preserves_split(tmp_path
     with pytest.raises(ValueError, match="未知标签"):
         project.build_dataset({"seed": 123})
     assert (project.root / "splits.json").read_bytes() == frozen
-    assert list((project.root / "datasets").iterdir()) == [directory]
+    # datasets/.objects is the internal shared-image store, not another snapshot.
+    assert [path for path in (project.root / "datasets").iterdir() if not path.name.startswith(".")] == [directory]
 
 
 def test_group_count_selection_finds_attainable_image_target():
@@ -243,3 +244,51 @@ def test_near_duplicate_candidate_search_is_bounded_and_reports_limit(tmp_path):
         add_image(project, f"{i:02}.png", pixels)
     preview = project.split_preview()
     assert any("上限" in text for text in preview["warnings"])
+
+
+def test_individual_mode_splits_identical_images_by_name_and_skips_group_scan(tmp_path, monkeypatch):
+    project = project_at(tmp_path)
+    for i in range(10):
+        add_image(project, f"{i}.png", textured())
+    video(project, "single", [p.name for p in project.images])
+    def reject_grouping(*args):
+        raise AssertionError("individual mode must not scan for source/near duplicates")
+    monkeypatch.setattr(dataset_split, "_group_images", reject_grouping)
+    options = {"split_grouped": False, "mode": "count", "count": 3}
+    preview = project.split_preview(options)
+    assert preview["ready"] and preview["val"] == 3
+    assert preview["video_groups"] == preview["similar_groups"] == 0
+    directory, manifest = rows(project, options)
+    assert sum(row["split"] == "val" for row in manifest["images"]) == 3
+    assert manifest["source_grouping"]["algorithm"] == "seeded-individual-images"
+    assert project.split_preview()["dataset_revision"] == preview["dataset_revision"]
+    assert project.split_preview(options)["dataset_revision"] == preview["dataset_revision"]
+
+
+def test_disabling_grouping_repartitions_frozen_split_to_exact_target(tmp_path):
+    project = project_at(tmp_path)
+    for i in range(10):
+        add_image(project, f"{i}.png", (i * 20, 30, 40))
+    video(project, "large", [f"{i}.png" for i in range(9)])
+    options = {"mode": "count", "count": 3, "split_grouped": True}
+    old_directory, old_manifest = rows(project, options)
+    assert sum(row["split"] == "val" for row in old_manifest["images"]) == 1
+    options["split_grouped"] = False
+    preview = project.split_preview(options)
+    assert preview["ready"] and preview["val"] == 3
+    _, manifest = rows(project, options)
+    assert sum(row["split"] == "val" for row in manifest["images"]) == 3
+    assert read_json(old_directory / "manifest.json") == old_manifest
+    options["split_grouped"] = True
+    assert project.split_preview(options)["val"] == 1
+
+
+def test_removing_individual_image_clears_only_its_frozen_entry(tmp_path):
+    project = project_at(tmp_path)
+    for i in range(3):
+        add_image(project, f"{i}.png", textured())
+    rows(project, {"split_grouped": False})
+    project.remove_image(project.root / "images" / "0.png")
+    assignments = read_json(project.root / "splits.json")["assignments"]
+    assert "image:0.png" not in assignments
+    assert set(assignments) == {"image:1.png", "image:2.png"}

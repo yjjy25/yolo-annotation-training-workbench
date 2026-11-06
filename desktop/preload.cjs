@@ -23,6 +23,17 @@ contextBridge.exposeInMainWorld('workbench',{
   diagnostics:()=>ipcRenderer.invoke('desktop:diagnostics'),
   nativeInput:data=>ipcRenderer.send('desktop:native-input',data),
   nativeView:data=>ipcRenderer.send('desktop:native-view',data),
+  maixcam:{
+    state:()=>ipcRenderer.invoke('desktop:maixcam-state'),
+    connect:address=>ipcRenderer.invoke('desktop:maixcam-connect',address),
+    disconnect:()=>ipcRenderer.invoke('desktop:maixcam-disconnect'),
+    start:interval=>ipcRenderer.invoke('desktop:maixcam-start',interval),
+    stop:()=>ipcRenderer.invoke('desktop:maixcam-stop'),
+    single:()=>ipcRenderer.invoke('desktop:maixcam-single'),
+    flush:()=>ipcRenderer.invoke('desktop:maixcam-flush'),
+    folder:()=>ipcRenderer.invoke('desktop:maixcam-folder'),
+    onEvent:callback=>{const listener=(_event,data)=>callback(data);ipcRenderer.on('desktop:maixcam-event',listener);return()=>ipcRenderer.removeListener('desktop:maixcam-event',listener);}
+  },
   onNativeFrame:callback=>ipcRenderer.on('desktop:native-frame',(_event,data)=>callback(data)),
   onState:callback=>{const listener=(_event,data)=>callback(data);ipcRenderer.on('desktop:state',listener);return()=>ipcRenderer.removeListener('desktop:state',listener);}
   ,onBeforeClose:callback=>{ipcRenderer.on('desktop:before-close',async()=>{let payload={};try{payload=await callback();}finally{ipcRenderer.invoke('desktop:close-ready',payload);}});}

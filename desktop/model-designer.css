@@ -127,3 +127,69 @@ body:has(#design-help-dialog[open]) #dialog-scrim{z-index:140}
 .design-edit-box>label:first-child select{margin:0;min-width:0}
 .design-edit-box>label:first-child .design-help-pin{margin:0}
 #design-readonly-details{margin:12px 0}
+.design-conflict{border:1px solid var(--accent);border-radius:8px;padding:12px 16px;margin:10px 0;background:var(--tint)}
+.design-conflict pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;font-size:12px;line-height:1.7}
+.design-conflict p{font-size:12px;color:var(--muted);line-height:1.7}
+#design-geometry{border:1px solid var(--border);border-radius:7px;padding:10px;margin:12px 0;min-width:0}
+#design-geometry legend{font-size:12px}#design-geometry label{font-size:12px}
+#design-geometry input,#design-geometry select{width:100%;min-width:0;box-sizing:border-box}
+/* Tensor workspace: measured IO stays fixed; selection and edits share one rail. */
+#page-design [hidden]{display:none!important}
+#page-design .design-grid{grid-template-columns:minmax(280px,1fr) 360px}
+#page-design .design-space-host{position:relative;flex:1;min-height:220px;overflow:hidden;border:1px solid var(--border);border-radius:8px;background:var(--canvas)}
+#design-space,#design-local-space{display:block;width:100%;height:100%;touch-action:none;cursor:grab;outline-offset:-3px}
+#design-space:active,#design-local-space:active{cursor:grabbing}
+.design-space-key{position:absolute;bottom:12px;left:14px;right:10px;display:flex;gap:8px 16px;flex-wrap:wrap;font-size:10px;color:var(--muted);pointer-events:none}
+#page-design .design-view-switch{gap:3px;margin:0}.design-view-switch button{font-size:11px;padding:5px 8px}
+.design-view-switch button[aria-pressed="true"]{color:var(--accent);border-color:var(--accent);background:var(--tint)}
+#page-design .design-inspector-head{padding:12px 14px 9px}
+#page-design .design-inspector-head h2{font-size:15px;font-weight:600}
+#design-current-path{display:block;color:var(--accent);font-size:11px;font-family:inherit;overflow-wrap:anywhere;line-height:1.5;margin:5px 0 10px}
+.design-io{display:grid;grid-template-columns:minmax(0,1fr) 14px minmax(0,1fr);align-items:center;gap:5px}
+.design-io>div{min-width:0}.design-io span{display:block;color:var(--muted);font-size:10px}
+.design-io strong{display:block;font-size:13px;font-weight:600;line-height:1.7;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.design-io .design-io-arrow{font-size:14px;color:var(--accent)}
+#design-measurement-note{font-size:10px;margin:4px 0 0;line-height:1.6}
+#page-design .design-inspector-body{padding:0 14px 14px}
+.design-local-space{height:140px;position:relative;border-bottom:1px solid var(--border);margin-bottom:10px}
+.design-unit-label{display:block;color:var(--muted);font-size:11px}
+#page-design #design-unit{font-size:12px;padding:7px;margin:4px 0 10px;overflow:hidden;text-overflow:ellipsis}
+#page-design .design-operators{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:10px}
+#page-design .design-operators button{flex:1;border:0;border-radius:0;background:transparent;text-align:center;padding:7px 8px;line-height:1.4;border-bottom:2px solid transparent}
+#page-design .design-operators button.selected{border-bottom-color:var(--accent);background:transparent}
+#page-design .design-operators button strong{font-size:12px;font-weight:500}
+#page-design .design-operators button small{display:none}
+#page-design .design-edit-box{border:0;background:transparent;border-radius:0;padding:0}
+#page-design .design-edit-box>label:first-child{font-size:12px}
+#page-design #design-explanation{border:0;background:transparent;padding:0;margin:0 0 10px}
+#design-explanation summary{font-size:11px;color:var(--muted)}
+#page-design #design-geometry{margin:10px 0;padding:9px}
+#page-design #design-geometry .design-inline-note{font-size:10px;line-height:1.5}
+#page-design #design-edit-help{display:none}
+#page-design .design-step-title{font-size:11px;margin:8px 0;color:var(--muted);font-weight:400}
+#page-design .design-step-title b{display:none}
+#page-design .design-inspector-body>.muted{display:none}
+#page-design .design-inspector-body>details{margin:10px 0}
+@media(max-width:1150px){#page-design .design-grid{grid-template-columns:minmax(240px,1fr) 330px}#page-design .design-toolbar{gap:4px}}
+@media(prefers-reduced-motion:reduce){#page-design *{scroll-behavior:auto!important;transition:none!important}}
+/* An exploded assembly view keeps compound modules visibly layered. */
+#page-design .design-space-host{display:flex;background:#111923;border-radius:10px}
+.design-scene-stage{position:relative;min-width:0;flex:1;height:100%;overflow:hidden}
+.design-space-caption{position:absolute;left:16px;top:14px;z-index:1;color:var(--muted);font-size:11px;letter-spacing:.1px;pointer-events:none}
+.design-depthbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:2px 0 5px;flex-wrap:wrap}
+.design-depthbar .button-row{margin:0;gap:4px}
+.design-depthbar button{font-size:11px;padding:6px 10px;background:transparent;border-color:transparent}
+.design-depthbar button[aria-pressed="true"]{background:var(--tint);color:var(--accent);border-color:var(--border)}
+#design-space-count{font-size:10px;color:var(--muted)}
+.design-layer-tree{flex:0 0 174px;width:174px;padding:35px 8px 14px;overflow:auto;border-right:1px solid var(--border);background:var(--surface)}
+.design-layer-tree details{margin:0;padding:0 0 0 8px;border:0;background:transparent}
+.design-layer-tree details>summary{margin:0;padding:0;white-space:nowrap;color:var(--muted);font-size:10px}
+.design-layer-tree button{display:inline-block;font-family:inherit;font-size:10px;border:0;border-radius:4px;max-width:100%;padding:5px 6px;text-align:left;white-space:nowrap;background:transparent;color:var(--muted)}
+.design-layer-tree>button,.design-layer-tree details>button{display:block;margin-left:12px}
+.design-layer-tree button:hover{color:var(--text);background:var(--hover)}
+.design-layer-tree button.selected{background:var(--tint);color:var(--accent);box-shadow:inset 2px 0 var(--accent)}
+#page-design .design-local-space{height:118px}
+.design-space-key{font-size:10px;line-height:1.5;bottom:10px;left:16px;right:16px}
+[data-theme="light"] #page-design .design-space-host{background:#f4f7fa}
+@media(max-width:1150px){.design-layer-tree{flex-basis:142px;width:142px;padding-left:3px;padding-right:3px}.design-layer-tree button{font-size:9px}.design-layer-tree details{padding-left:5px}}
+.is-layer-view #design-stages{display:none}

@@ -8,7 +8,7 @@ let passed=0;
 function editor(shape,mode='select',zoom=1){
  const e=Object.create(proto);
  Object.assign(e,{image:{naturalWidth:100,naturalHeight:100},data:{shapes:[structuredClone(shape)]},
-  selected:-1,selectedMany:[],project:{task:'detect'},mode,zoom,offset:[20,20],
+  selected:-1,selectedMany:[],project:{task:'detect',classes:['object']},mode,zoom,offset:[20,20],
   pending:[],pose:null,history:[],future:[],drag:null,shapeType:'rectangle',
   canvas:{focus(){},style:{},getBoundingClientRect(){return {left:0,top:0};},
    setPointerCapture(){this.captured=true;},hasPointerCapture(){return this.captured;},
@@ -64,5 +64,24 @@ for(const mode of ['draw','select']){
 {
  const e=editor(box,'draw');e.shapeType='polygon';e.pending=[[30,30],[40,30]];
  e.down(event(e,[0,0]));assert.equal(e.drag,null);assert.equal(e.pending.length,3);passed++;
+}
+// W enters drawing mode without firing while typing, composing or using a
+// modifier; R remains an alias. These run against the real key handler.
+context.document.querySelector=()=>null;
+for(const key of ['w','W','r']){
+ const e=editor(box);e.callbacks.isEditor=()=>true;e.setMode=mode=>{e.mode=mode;};
+ e.key({key,target:{tagName:'BODY'},preventDefault(){}});
+ assert.equal(e.mode,'draw');passed++;
+}
+for(const flags of [{ctrlKey:true},{altKey:true},{metaKey:true},{isComposing:true},{repeat:true},{target:{tagName:'INPUT',type:'text'}}]){
+ const e=editor(box);e.callbacks.isEditor=()=>true;e.setMode=mode=>{e.mode=mode;};
+ e.key({key:'w',target:{tagName:'BODY'},preventDefault(){},...flags});
+ assert.equal(e.mode,'select');passed++;
+}
+for(const dpr of [1,1.25,2]){
+ context.devicePixelRatio=dpr;
+ const e=editor(box);e.canvas.getBoundingClientRect=()=>({width:500,height:300});
+ e.nativeSize();assert.equal(e.zoom*dpr,1);
+ assert.equal(e.offset[0],(500-100/dpr)/2);passed++;
 }
 console.log(`Passed ${passed} edge interaction cases`);

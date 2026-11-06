@@ -22,6 +22,9 @@ module.exports=async({win,app,backend,request,ready,dialog,chooseFile})=>{
   await wait(()=>ev("!$('#video-dialog').open&&state.project.counts.total===10"));
   check('two real videos extract 5 frames each through the data import UI',true);
   await ev("go('editor')");await wait(()=>ev('!!editor.image'));
+  check('extracted video frames are lossless PNG at decoded resolution',await ev("editor.name.endsWith('.png')&&editor.image.naturalWidth>0&&$('#zoom-value').textContent.includes(editor.image.naturalWidth+'×'+editor.image.naturalHeight)"));
+  await ev("window.__originalDrawImage=editor.ctx.drawImage;editor.ctx.drawImage=function(...args){window.__sourceSmoothing=this.imageSmoothingEnabled;return window.__originalDrawImage.apply(this,args);};$('#native-image').click();editor.ctx.drawImage=window.__originalDrawImage;void 0");
+  check('native pixel view maps each source pixel to one display pixel',await ev("Math.abs(editor.zoom*devicePixelRatio-1)<1e-9&&window.__sourceSmoothing===false"));
   check('annotation canvas hides video timeline',await ev("$('#video-timeline').hidden&&getComputedStyle($('#video-timeline')).display==='none'"));await shot('canvas-without-timeline.png');
   const current=await ev('editor.name');await ev('navigate(1)');check('hidden timeline preserves video frame navigation',await ev(`editor.name!==${JSON.stringify(current)}`));
   await ev("go('data')");await ev("$('#import-data').click()");await select('tracking');answer={canceled:false,filePaths:files};await ev("$('#import-data-choose').onclick()");await ev("$('#import-data-form').requestSubmit();void 0");

@@ -245,7 +245,7 @@ def test_training_payload_never_carries_nms_thresholds(tmp_path,qt_application,m
         def send(self,*a,**k):pass
         closing_requested=False
     controller=DesktopController(Bridge())
-    controller.start_training({"model":"yolov8n.pt","device":"cpu","epochs":1,"batch":1,"imgsz":64,
+    controller.start_training({"model":"yolov8n.pt","allow_download":True,"device":"cpu","epochs":1,"batch":1,"imgsz":64,
         "workers":0,"patience":1,"lr0":0.01,"optimizer":"SGD","iou":0.45,"conf":0.35})
     try:
         assert started

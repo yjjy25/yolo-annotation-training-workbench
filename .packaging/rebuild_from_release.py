@@ -51,8 +51,13 @@ def join(platform):
 
 def sources():
     result={}
-    for p in (ROOT/'desktop').iterdir():
-        if p.is_file() and p.suffix in {'.cjs','.js','.html','.css','.json','.svg','.png','.ico'} and p.name!='package-lock.json':result['resources/app/'+p.name]=p.read_bytes()
+    # Recursive: the capture page opens desktop/maixcam/maixcam_server.py by path.
+    for base,dirs,names in os.walk(ROOT/'desktop'):
+        dirs[:]=[d for d in dirs if d not in {'node_modules','__pycache__'} and not d.startswith('.')]
+        for name in names:
+            p=Path(base)/name
+            if p.name!='package-lock.json' and p.suffix in {'.cjs','.js','.html','.css','.json','.svg','.png','.ico','.py'}:
+                result['resources/app/'+p.relative_to(ROOT/'desktop').as_posix()]=p.read_bytes()
     excluded={'.git','__pycache__','.pytest_cache','.ruff_cache','node_modules','runs','dist','build','.venv','.runtime'}
     for base,dirs,names in os.walk(ROOT/'X-AnyLabeling'):
         dirs[:]=[d for d in dirs if d not in excluded and not d.endswith('.egg-info')]
@@ -61,7 +66,7 @@ def sources():
             p=Path(base)/name
             result['resources/workbench/'+p.relative_to(ROOT).as_posix()]=p.read_bytes()
     for name in ['.runtime/launcher.pyw']+[p.relative_to(ROOT).as_posix() for p in (ROOT/'.runtime/fonts').iterdir() if p.is_file()]:result['resources/workbench/'+name]=(ROOT/name).read_bytes()
-    result['使用说明.md']=(ROOT/'文档/v0.6_安装说明.md').read_bytes()
+    result['使用说明.md']=(ROOT/'文档/v0.7_安装说明.md').read_bytes()
     result['SOURCE-LICENSE-GPL3.txt']=(ROOT/'X-AnyLabeling/LICENSE').read_bytes()
     result['源码与许可说明.txt']=('本包包含 Electron 与 X-AnyLabeling 扩展源码及第三方许可。\n界面源码：resources/app；Python 源码：resources/workbench/X-AnyLabeling。\nWindows 用户数据位于程序旁“工作台数据”；Ubuntu DEB 用户数据位于 ~/.config/AnnotationTrainingWorkbench。\n升级前请保存并退出旧版；项目数据不包含在安装包中。\n').encode()
     return result
