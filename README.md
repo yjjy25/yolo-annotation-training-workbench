@@ -1,10 +1,10 @@
-# YOLO 标注训练一体化工具 v0.7.1
+# YOLO 标注训练一体化工具 v0.7.2
 
 模型转换与量化：训练页状态区的“转换这个模型”、已训练模型行的“转换 / 量化”、“项目模型管理”行的“转换”，都会带着该 `best.pt` 直接进入转换页；也可以点“选择本地 PT 权重”直接转换自己的 `.pt`，不必先建项目。支持 YOLO PT → ONNX FP32 / FP16 / INT8，以及 TorchScript FP32。INT8 需要代表性真实图片进行静态 QDQ 校准，无需手写 YAML；FP16 需要目标设备支持。输出位于 `exports/<独立任务目录>`（打开项目时在项目内，未打开项目时在工作台数据目录），包含模型和可追溯的 `export.json`，不覆盖原权重。转换在独立进程运行，可查看日志或停止。当前不包含 TensorRT / OpenVINO 导出；转换成功不代表量化后的精度和速度已经通过验证。
 
 基于完整 X-AnyLabeling 4.1.3 源码扩展，使用 Electron 外壳。标注、视频追踪、模型验证和训练在同一个窗口完成。
 
-**v0.7.1 补上了“训练完直接转换”和免建项目的本地转换，MaixCAM 导出扩展到 YOLOv5u / YOLOv8 / YOLO11 / YOLO26。v0.7 新增 WiFi 摄像头采集与 MaixCAM 导出，模型结构页改为 3D 张量视图并开放部分顶层卷积的填充/步幅编辑；训练快照改为硬链接共享图片，重复训练不再占用整批副本。提供 Windows x64 与 Ubuntu amd64 自带运行库安装包和对应源码。**
+**v0.7.2 新增“快捷键介绍”（F1）。v0.7.1 补上了“训练完直接转换”和免建项目的本地转换，MaixCAM 导出扩展到 YOLOv5u / YOLOv8 / YOLO11 / YOLO26。v0.7 新增 WiFi 摄像头采集与 MaixCAM 导出，模型结构页改为 3D 张量视图并开放部分顶层卷积的填充/步幅编辑；训练快照改为硬链接共享图片，重复训练不再占用整批副本。提供 Windows x64 与 Ubuntu amd64 自带运行库安装包和对应源码。**
 
 ## 这次更新
 
@@ -30,14 +30,14 @@
 2. **模块与连线编辑**：逐步开放添加、复制、删除模块和调整连接，并核对通道、空间尺寸与检测步长。
 3. **更直观的实验对比**：继续简化说明，记录修改，并逐步对比原始模型和修改模型的训练结果。
 
-这些是后续方向，不代表本版已支持。完整更新见 [CHANGELOG](CHANGELOG.md)，本次发布范围见 [v0.7.1 发布说明](文档/v0.7.1_发布说明.md)。
+这些是后续方向，不代表本版已支持。完整更新见 [CHANGELOG](CHANGELOG.md)，本次发布范围见 [v0.7.2 发布说明](文档/v0.7.2_发布说明.md)。
 
 ## 下载与启动
 
-**v0.7.1 下载**：[GitHub 版本页](https://github.com/yjjy25/yolo-annotation-training-workbench/releases/tag/v0.7.1)。安装包下载、分卷合并与升级方法见 [安装说明](文档/v0.7.1_安装说明.md)。
+**v0.7.2 下载**：[GitHub 版本页](https://github.com/yjjy25/yolo-annotation-training-workbench/releases/tag/v0.7.2)。安装包下载、分卷合并与升级方法见 [安装说明](文档/v0.7.2_安装说明.md)。
 
-- Windows 10/11 x64：[下载 Windows 离线安装包分卷](https://github.com/yjjy25/yolo-annotation-training-workbench/releases/tag/v0.7.1)。运行后选择位置并解压安装，可创建桌面快捷方式。包含独立 Python、Electron、CPU/CUDA 训练组件，无需另装 Python。程序可整体移动，移动前先退出。
-- Ubuntu x86_64：[下载 Ubuntu DEB 安装包分卷](https://github.com/yjjy25/yolo-annotation-training-workbench/releases/tag/v0.7.1)。通过软件安装器打开；也可执行 `sudo apt install ./AnnotationWorkbench-0.7.1-Ubuntu-amd64.deb`。安装后在应用菜单找到“标注训练工作台”。系统图形库缺失时由 apt 补齐。
+- Windows 10/11 x64：[下载 Windows 离线安装包分卷](https://github.com/yjjy25/yolo-annotation-training-workbench/releases/tag/v0.7.2)。运行后选择位置并解压安装，可创建桌面快捷方式。包含独立 Python、Electron、CPU/CUDA 训练组件，无需另装 Python。程序可整体移动，移动前先退出。
+- Ubuntu x86_64：[下载 Ubuntu DEB 安装包分卷](https://github.com/yjjy25/yolo-annotation-training-workbench/releases/tag/v0.7.2)。通过软件安装器打开；也可执行 `sudo apt install ./AnnotationWorkbench-0.7.2-Ubuntu-amd64.deb`。安装后在应用菜单找到“标注训练工作台”。系统图形库缺失时由 apt 补齐。
 - 源码运行：先按下方“源码开发”准备环境，再双击 `双击启动.vbs` 或运行 `bash start.sh`。
 
 完整离线包超过 GitHub 单文件限制，需要先合并分卷：
@@ -117,7 +117,7 @@ Windows 和 Ubuntu 是不同文件，不能互相替代。离线包体积较大�
 
 上传 GitHub 应使用已检查的 Git 文件清单，或修正并验收后的 `.packaging/package_source.py` 干净源码导出，保留 LICENSE、THIRD_PARTY_NOTICES.md 和上游版权。个人项目、备份、运行库、权重和大型发行包已排除；不要直接上传整个开发目录。安装包放在 Releases。完整版超过 GitHub 单个 Release 文件 2 GiB 限制，使用 `发行包/GitHub-Releases` 中的分卷、parts.json 和 join.py；用户下载同一平台的全部分卷及校验清单后运行 `powershell -ExecutionPolicy Bypass -File .\join.ps1` 或 `bash join.sh Ubuntu`（也提供 Python 重组脚本），将验证 SHA256 并合成原安装包。
 
-v0.7.1 的发布范围与验证记录见 [发布说明](文档/v0.7.1_发布说明.md)。旧 v0.6、v0.5.2 安装包的历史验证范围见各自的发布检查记录。已在现有 Windows 与 WSLg 环境验证的内容不代表全部模型、硬件和 Linux 发行版均已验收。
+v0.7.2 的发布范围与验证记录见 [发布说明](文档/v0.7.2_发布说明.md)。旧 v0.6、v0.5.2 安装包的历史验证范围见各自的发布检查记录。已在现有 Windows 与 WSLg 环境验证的内容不代表全部模型、硬件和 Linux 发行版均已验收。
 
 ## 视频与姿态标注扩展（源码）
 

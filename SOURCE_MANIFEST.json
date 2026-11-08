@@ -22,7 +22,7 @@
   {
     "path": ".packaging/build_release.py",
     "size": 8926,
-    "sha256": "f516f47ba14f8e4bfec762e4501088e62bb436fbbf5dd1520c01f3b9a501bff6"
+    "sha256": "ce84767679ab0357facc4f586a25502cf8c4ca6ab2ce45c5f0d6cb1b5a112ea2"
   },
   {
     "path": ".packaging/Installer.cs",
@@ -67,7 +67,7 @@
   {
     "path": ".packaging/verify_release.py",
     "size": 5198,
-    "sha256": "48e1816a86fa9a935c974805625502180888c93723763a2266743a7a11e52130"
+    "sha256": "9fb7628b559b5b4324edd17f7edfa1a4ef0e57021fff0f31100939a96a4a12e3"
   },
   {
     "path": ".packaging/构建说明.md",
@@ -96,8 +96,8 @@
   },
   {
     "path": "CHANGELOG.md",
-    "size": 13687,
-    "sha256": "96457a62eee994a608230ef7db522069d94747f1650c73fad46709fa395cfbd6"
+    "size": 14052,
+    "sha256": "f47f7c9ab0a0ce981397869d5a6825db60a9264d28118233115525a147c07915"
   },
   {
     "path": "desktop/ai-preview-qa.cjs",
@@ -332,7 +332,7 @@
   {
     "path": "desktop/package-lock.json",
     "size": 5880,
-    "sha256": "6fe6be0920de283c51495a493d73d145f14fe44871792b7a7eaddb2e1c6cd1de"
+    "sha256": "40ce753d0f8c28d427d85ff5ea23b71a901fe1f5fa70635b7fddbd44583ad468"
   },
   {
     "path": "desktop/package-qa.cjs",
@@ -342,7 +342,7 @@
   {
     "path": "desktop/package.json",
     "size": 3127,
-    "sha256": "790a6189e9984ec2f7a8fb369bb040cc6f10f50e34f228d25816df61df757dd4"
+    "sha256": "c4325fc0434b92cbdcdb7f847112af61475bd06900d0778a8fdc2e90450e5555"
   },
   {
     "path": "desktop/pages-qa.cjs",
@@ -431,18 +431,18 @@
   },
   {
     "path": "desktop/studio.css",
-    "size": 54623,
-    "sha256": "83fc6f6182660cd4562ed19e023d60dca1d8b060b68ae568f237983170ba4013"
+    "size": 58361,
+    "sha256": "93e6357ac25731076824e2a42915a561ed96ef0e91bcaee11a3942d29eda93b8"
   },
   {
     "path": "desktop/studio.html",
-    "size": 69483,
-    "sha256": "a11e5cfa464aa9cc6de575dfc66773202c69f3cd05cbb5d209c4065565ef93a7"
+    "size": 74564,
+    "sha256": "86b825707c81fead512672fbfd0b61cc11a0f2b3f649ef4966ccd98ed99231ca"
   },
   {
     "path": "desktop/studio.js",
-    "size": 85854,
-    "sha256": "cf17d603a0d2f834c0f3a9588a2cfe54178bd78bd4bf5ff15867ac4808ca2a54"
+    "size": 87582,
+    "sha256": "39303d0211112c53d023748736a6405bbf24ba540ae9d5e930ef331548d38a8c"
   },
   {
     "path": "desktop/traincheck-qa.cjs",
@@ -511,8 +511,8 @@
   },
   {
     "path": "README.md",
-    "size": 15400,
-    "sha256": "1859a009806bb1b6ac58b7d875be51684840bfacf2aece2fe3dbd39286e85443"
+    "size": 15445,
+    "sha256": "251280171b35bb480410a9e37c26a3e63a5244d42c84a1390f2f2b512159b0d4"
   },
   {
     "path": "setup-linux.sh",
@@ -7920,6 +7920,11 @@
     "sha256": "36c86d4f65a889141dbbc8fc3d7f1b2c07b42645c565928dd5e941a92fe301a5"
   },
   {
+    "path": "文档/0.7.2_发布检查.md",
+    "size": 1760,
+    "sha256": "8c0c53efa2823083a755ba8e644af65862d8ec9942fbd218f0616dfa14e210ff"
+  },
+  {
     "path": "文档/0.7_发布检查.md",
     "size": 2329,
     "sha256": "9600dce19f722893815071fcb8653f04624537dd29d69b3b059c52490cc7603a"
@@ -7958,6 +7963,16 @@
     "path": "文档/v0.7.1_安装说明.md",
     "size": 4379,
     "sha256": "9b626374fdd1acfa82460222010f2b318923e8222a9172397beb24680910ceac"
+  },
+  {
+    "path": "文档/v0.7.2_发布说明.md",
+    "size": 1910,
+    "sha256": "4d279c475edb0dc710facb2be76a18c3761cd9f8da22a6d1e1a10ca1e163bdb0"
+  },
+  {
+    "path": "文档/v0.7.2_安装说明.md",
+    "size": 4805,
+    "sha256": "4ec260d470f4d3548029c3770c9b7979cb2c38393386f6a15181f820a3999dfd"
   },
   {
     "path": "文档/v0.7_发布说明.md",

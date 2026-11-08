@@ -42,7 +42,7 @@ def source_files():
     files['resources/workbench/.runtime/launcher.pyw'] = ROOT/'.runtime/launcher.pyw'
     for p in (ROOT/'.runtime/fonts').iterdir():
         if p.is_file(): files['resources/workbench/.runtime/fonts/'+p.name] = p
-    files['使用说明.md'] = ROOT/'文档/v0.7.1_安装说明.md'
+    files['使用说明.md'] = ROOT/'文档/v0.7.2_安装说明.md'
     files['SOURCE-LICENSE-GPL3.txt'] = ROOT/'X-AnyLabeling/LICENSE'
     return files
 

@@ -1,6 +1,6 @@
 {
   "name": "annotation-training-workbench",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "private": true,
   "description": "Integrated Electron annotation and training studio with full X-AnyLabeling tools",
   "main": "main.cjs",

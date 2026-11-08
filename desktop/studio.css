@@ -190,6 +190,41 @@ dialog::backdrop{backdrop-filter:blur(3px)}
 ::-webkit-scrollbar-corner{background:transparent}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 
+/* Shortcut reference shares the active light/dark theme. */
+#shortcut-help{display:flex;align-items:center;justify-content:space-between;width:100%;margin-bottom:12px;padding:7px 9px;font-size:12px;color:var(--muted);background:transparent;border-color:transparent}
+#shortcut-help:hover{background:var(--hover);color:var(--text)}
+#shortcut-dialog{width:min(680px,calc(100vw - 40px));padding:0;overflow:hidden;border-radius:12px}
+#shortcut-dialog[open]{display:flex;flex-direction:column}
+.shortcut-header{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding:24px 26px 18px;flex-shrink:0}
+#shortcut-title{font-size:19px;font-weight:600;letter-spacing:0}
+#shortcut-dialog p{font-size:12px;line-height:1.7}
+#shortcut-intro{margin-top:5px;color:var(--muted)}
+#shortcut-close{display:flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;border:0;background:transparent;color:var(--muted);font-size:23px;line-height:1;border-radius:6px}
+#shortcut-close:hover{background:var(--hover);color:var(--text)}
+#shortcut-dialog kbd,#shortcut-help kbd{display:inline-flex;align-items:center;justify-content:center;min-width:23px;min-height:23px;border:1px solid var(--border);border-radius:4px;background:var(--input);color:var(--text);padding:0 6px;font:inherit;font-size:11px;white-space:nowrap;box-shadow:0 1px 0 var(--border)}
+#shortcut-help kbd{min-height:19px;font-size:10px;color:var(--muted);box-shadow:none}
+.shortcut-tabs{display:flex;gap:24px;padding:0 26px;border-bottom:1px solid var(--border);flex-shrink:0}
+.shortcut-tabs button{position:relative;padding:10px 0 12px;border:0;border-radius:0;background:transparent;color:var(--muted);font-size:12px;white-space:nowrap}
+.shortcut-tabs button:hover{background:transparent;color:var(--text)}
+.shortcut-tabs button[aria-pressed=true]{color:var(--accent);font-weight:600}
+.shortcut-tabs button[aria-pressed=true]::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:2px;background:var(--accent);border-radius:2px}
+.shortcut-tabs button:focus-visible,#shortcut-close:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.shortcut-groups{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:10px 26px 14px;flex:1}
+.shortcut-groups table{width:100%;border-collapse:collapse;font-size:12px}
+.shortcut-groups thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.shortcut-groups tr{display:flex;align-items:center;gap:24px;min-height:39px;padding:7px 0}
+.shortcut-groups tbody tr+tr{border-top:1px solid color-mix(in srgb,var(--border) 45%,transparent)}
+.shortcut-groups td{padding:0;line-height:1.7}
+.shortcut-groups td:first-child{order:2;flex:0 0 44%;text-align:right;color:var(--subtle);font-size:11px}
+.shortcut-groups td:last-child{flex:1;color:var(--text)}
+.shortcut-groups section>p{margin-top:10px;color:var(--muted)}
+.shortcut-footer{padding:14px 26px 17px;border-top:1px solid var(--border);background:var(--surface-2);flex-shrink:0}
+.shortcut-footer strong{font-weight:500;color:var(--text);margin-right:8px}
+.shortcut-footer>div{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:9px;font-size:11px;color:var(--subtle)}
+.shortcut-footer>div>span:last-child{flex-shrink:0}
+.shortcut-footer kbd{min-width:24px;min-height:19px;margin-right:5px;font-size:10px;box-shadow:none}
+@media(max-width:560px){.shortcut-header{padding:20px 18px 14px}.shortcut-tabs{gap:18px;padding:0 18px}.shortcut-groups{padding:8px 18px 12px}.shortcut-groups tr{gap:12px}.shortcut-groups td:first-child{flex-basis:46%}.shortcut-footer{padding:12px 18px}.shortcut-footer>div{align-items:flex-end}}
+
 /* ---- help popovers and the validation source picker ---- */
 .help-pin{width:18px;height:18px;padding:0;margin-left:8px;border-radius:50%;border:1px solid var(--border);background:var(--input);color:var(--muted);font-size:11px;font-weight:700;line-height:1;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;vertical-align:middle}
 .help-pin:hover{background:var(--tint);color:var(--accent);border-color:var(--accent)}

@@ -935,6 +935,42 @@ for(const form of document.querySelectorAll('dialog')){
  form.showModal=function(){this.show();scrim.hidden=false;document.querySelector('main').inert=true;document.querySelector('.sidebar').inert=true;this.querySelector('input,button')?.focus();};
  form.addEventListener('close',()=>{const open=!!document.querySelector('dialog[open]');scrim.hidden=!open;document.querySelector('main').inert=open;document.querySelector('.sidebar').inert=open;});
 }
+// Shortcut reference uses the same dialog lifecycle as the other workbench forms.
+let shortcutReturnFocus=null;
+function showShortcutHelp(){
+ if(document.querySelector('dialog[open]'))return;
+ shortcutReturnFocus=document.activeElement;
+ editor.space=false;
+ $('#shortcut-dialog').showModal();
+ $('#shortcut-dialog .shortcut-groups').scrollTop=0;
+}
+$('#shortcut-help').onclick=showShortcutHelp;
+$('#shortcut-close').onclick=()=>$('#shortcut-dialog').close();
+document.querySelectorAll('[data-shortcut-group]').forEach(button=>button.onclick=()=>{
+ document.querySelectorAll('[data-shortcut-group]').forEach(tab=>tab.setAttribute('aria-pressed',String(tab===button)));
+ document.querySelectorAll('.shortcut-groups section').forEach(section=>section.hidden=section.id!==button.dataset.shortcutGroup);
+ $('#shortcut-dialog .shortcut-groups').scrollTop=0;
+});
+$('#shortcut-dialog').addEventListener('close',()=>{
+ if(shortcutReturnFocus?.isConnected)shortcutReturnFocus.focus();
+ shortcutReturnFocus=null;
+});
+document.addEventListener('keydown',event=>{
+ if($('#shortcut-dialog').open){
+  event.stopImmediatePropagation();
+  if(event.key==='Escape'){event.preventDefault();$('#shortcut-dialog').close();}
+  if(event.key==='Tab'){
+   const buttons=[...$('#shortcut-dialog').querySelectorAll('button')];
+   const next=buttons.indexOf(document.activeElement)+(event.shiftKey?-1:1);
+   event.preventDefault();buttons[(next+buttons.length)%buttons.length].focus();
+  }
+  return;
+ }
+ if(event.key==='F1'&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&!event.shiftKey&&!event.isComposing){
+  event.preventDefault();event.stopImmediatePropagation();
+  if(!event.repeat)showShortcutHelp();
+ }
+},true);
 document.addEventListener('keydown',event=>{if(event.key==='Escape'){const form=document.querySelector('dialog[open]');if(form)form.close();}});
 /* Global shortcuts. Editor-local keys (V/R/1-9/Ctrl+S/Ctrl+Z) live in
    editor.js; these cover page switching and working through the image list. */
